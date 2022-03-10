@@ -1,19 +1,15 @@
-from email.policy import HTTP
-import json
-
-from coredis import StrictRedis
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
-from hikari.errors import UnauthorizedError
+from coredis import StrictRedis  # type: ignore
+from fastapi import APIRouter, Depends, Request, Response
 
 from .guild import get_guilds
-from ..shared import with_auth, auth_error, with_database, hikari_rest, limiter
+from ..shared import with_auth, with_database, limiter
 from ..models import GuildInfo
 
 
 router = APIRouter(tags=["user"])
 
 
-# @router.get("/user/@me", response_model=UserInfo, responses={**auth_error})
+# @router.get("/user/@me", response_model=UserInfo)
 # @limiter.limit("5/5")
 # async def user_me(
 #     request: Request,
@@ -24,7 +20,7 @@ router = APIRouter(tags=["user"])
 #     return await get_userme(database, user_id)
 
 
-# @router.get("/user/@me/account", response_model=Account, responses={**auth_error})
+# @router.get("/user/@me/account", response_model=Account)
 # @limiter.limit("5/5")
 # async def user_me_account(
 #     request: Request,
@@ -37,7 +33,7 @@ router = APIRouter(tags=["user"])
 #     return {"user": userobj, "subscriptions": [], "receipts": []}
 
 
-@router.delete("/user/@me/sessions", status_code=204, responses={**auth_error})
+@router.delete("/user/@me/sessions", status_code=204)
 @limiter.limit("2/5minute")
 async def user_me_delete_sessions(
     request: Request,
@@ -52,9 +48,7 @@ async def user_me_delete_sessions(
         await database.delete(*sessions)
 
 
-@router.get(
-    "/user/@me/guilds", response_model=list[GuildInfo], responses={**auth_error}
-)
+@router.get("/user/@me/guilds", response_model=list[GuildInfo])
 async def user_me_guilds(
     request: Request,
     response: Response,

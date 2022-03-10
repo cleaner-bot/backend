@@ -10,10 +10,7 @@ from .shared import limiter
 app = FastAPI()
 load_dotenv("~/.cleaner/secrets")
 
-origins = [
-    "http://localhost:3000",
-    "https://cleaner.leodev.xyz"
-]
+origins = ["http://localhost:3000", "https://cleaner.leodev.xyz"]
 
 app.add_middleware(RatelimitMiddleware)
 app.add_middleware(
@@ -21,7 +18,7 @@ app.add_middleware(
     allow_origins=origins,
     allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=["*"]
+    expose_headers=["*"],
 )
 
 app.include_router(challenge.router)

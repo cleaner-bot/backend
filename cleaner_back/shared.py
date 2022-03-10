@@ -1,15 +1,14 @@
-
 import asyncio
 import json
 from datetime import datetime
 import os
 from typing import Union
 
-from coredis import StrictRedis
-from fastapi import Depends, HTTPException, Request, Header
+from coredis import StrictRedis  # type: ignore
+from fastapi import Depends, HTTPException, Header
 from hikari import RESTApp, Permissions, UnauthorizedError
 from httpx import AsyncClient
-from jose import jws
+from jose import jws  # type: ignore
 
 from cleaner_conf import entitlements
 from cleaner_ratelimit import Limiter, get_visitor_ip
@@ -30,13 +29,10 @@ def with_asyncclient() -> AsyncClient:
     return aclient
 
 
-async def with_hikari(database: StrictRedis = Depends(with_database)) -> RESTApp:
+async def with_hikari(database: StrictRedis = Depends(with_database)):
     token = await database.get(os.getenv("SECRET_BOT_TOKEN"))
     async with hikari_rest.acquire(token.decode(), "Bot") as restimpl:
         yield restimpl
-
-
-auth_error = {401: {"description": "Missing, invalid or expired session cookie"}}
 
 
 async def with_auth(
@@ -86,19 +82,19 @@ async def has_entitlement(database: StrictRedis, guild: str, entitlement: str) -
         value = entitlements[entitlement].default
     else:
         value = int(value)
-    
+
     if value == 0:
         return True
-    
+
     plan = await database.get(f"guild:{guild}:entitlement:plan")
     if plan is None:
         return False
-    
+
     return int(plan) >= value
 
 
-get_guilds_lock = {}
-get_user_lock = {}
+get_guilds_lock: dict[str, asyncio.Event] = {}
+get_user_lock: dict[str, asyncio.Event] = {}
 
 
 async def get_guilds(database: StrictRedis, user_id: str):
@@ -121,11 +117,11 @@ async def get_guilds(database: StrictRedis, user_id: str):
     try:
         async with hikari_rest.acquire(access_token.decode(), "Bearer") as selfbot:
             guilds = await selfbot.fetch_my_guilds()
-    
+
     except UnauthorizedError:
         await database.delete(f"user:{user_id}:oauth:token")
         raise HTTPException(401, "Session expired")
-    
+
     finally:
         get_guilds_lock[user_id].set()
         del get_guilds_lock[user_id]
@@ -135,9 +131,11 @@ async def get_guilds(database: StrictRedis, user_id: str):
         {
             "id": str(guild.id),
             "name": guild.name,
-            "icon": guild.make_icon_url(ext="webp", size=64).url if guild.icon_hash else None,
+            "icon": guild.make_icon_url(ext="webp", size=64).url  # type: ignore
+            if guild.icon_hash
+            else None,
             "is_owner": guild.is_owner,
-            "is_admin": guild.my_permissions & Permissions.ADMINISTRATOR > 0
+            "is_admin": guild.my_permissions & Permissions.ADMINISTRATOR > 0,
         }
         for guild in guilds
         if guild.my_permissions & required_permissions
@@ -180,20 +178,28 @@ async def get_userme(database: StrictRedis, user_id: str):
     userobj = {
         "id": user.id,
         "name": user.username,
-        "avatar": user.make_avatar_url(ext="webp", size=64).url,
+        "avatar": user.make_avatar_url(ext="webp", size=64).url  # type: ignore
+        if user.avatar_hash is not None
+        else None,
     }
     await database.set(f"cache:user:{user_id}", json.dumps(userobj), ex=30)
 
     return userobj
 
 
-limiter = Limiter(
-    key_func=get_visitor_ip, 
-    global_limits=[
-        "10/s",
-        "50/10s",
-        "100/m"
-    ]
-)
-x = CloudflareIPAccessRuleReporter()  # TODO: secrets
-limiter.jail = Jail(get_visitor_ip, "50/1m", )
+limiter = Limiter(key_func=get_visitor_ip, global_limits=["10/s", "50/10s", "100/m"])
+
+reporter = None
+
+if (cf_email := os.getenv("SECRET_CF_EMAIL")) and (
+    cf_token := os.getenv("SECRET_CF_TOKEN")
+):
+    zone = os.getenv("SECRET_CF_ZONE")
+    reporter = CloudflareIPAccessRuleReporter(
+        cf_email,
+        cf_token,
+        zone,
+        "Banned for exceeding ratelimits on cleaner.leodev.xyz/api",
+    )
+
+limiter.jail = Jail(get_visitor_ip, "50/1m", reporter)

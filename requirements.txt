@@ -7,3 +7,5 @@ python-jose>=3.3,<3.4
 slowapi>=0.1,<0.2
 hikari==2.0.0.dev107
 python-dotenv>=0.19,<0.20
+cleaner_conf@git+ssh://git@github.com/cleaner-bot/cleaner-config
+cleaner_ratelimit@git+ssh://git@github.com/cleaner-bot/cleaner-ratelimit

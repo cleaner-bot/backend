@@ -2,13 +2,13 @@ from datetime import datetime, timedelta
 import os
 from urllib.parse import urlencode
 
-from coredis import StrictRedis
+from coredis import StrictRedis  # type: ignore
 from fastapi import APIRouter, Depends, Request, Response, HTTPException
 from fastapi.responses import RedirectResponse
 from hikari import BadRequestError, UnauthorizedError, Permissions
 from hikari.urls import BASE_URL
 from hikari.impl import RESTClientImpl
-from jose import jws
+from jose import jws  # type: ignore
 
 from ..shared import with_database, with_hikari, hikari_rest, home, limiter
 
@@ -17,14 +17,25 @@ router = APIRouter(tags=["oauth"])
 
 
 base = "/oauth2/authorize"
-client_id = "823533449717481492"
+client_id = "823533449717481492"  # TODO: put in secrets
 redirect_uri = "http://localhost:3000/oauth-comeback"
 response_type = "code"
 scopes = ["identify", "guilds", "email"]
 
 allowed_components = (
-    "", "firewall", "antispam", "slowmode", "challenge", "logging",
-    "impersonation", "workers", "backup", "bot", "plan", "contact", "dev"
+    "",
+    "firewall",
+    "antispam",
+    "slowmode",
+    "challenge",
+    "logging",
+    "impersonation",
+    "workers",
+    "backup",
+    "bot",
+    "plan",
+    "contact",
+    "dev",
 )
 
 
@@ -37,7 +48,7 @@ async def oauth_redirect(
     guild: str = None,
     component: str = None,
     flow: str = None,
-    database: StrictRedis = Depends(with_database)
+    database: StrictRedis = Depends(with_database),
 ):
     if flow is not None:
         if len(flow) != 64 or not all(x in "0123456789abcdef" for x in flow):
@@ -55,7 +66,7 @@ async def oauth_redirect(
         if component not in allowed_components:
             raise HTTPException(400, "Invalid component")
         redirect_target = f"{home}/dash/{guild}/{component}"
-    
+
     state = os.urandom(64).hex()
     await database.set(f"dash:oauth:state:{state}", redirect_target, ex=600)
 
@@ -65,7 +76,7 @@ async def oauth_redirect(
         "response_type": response_type,
         "scope": " ".join(scopes),
         "state": state,
-        "prompt": "none"
+        "prompt": "none",
     }
 
     if bot:
@@ -86,7 +97,7 @@ async def oauth_redirect(
             permissions |= Permissions.ADMINISTRATOR
 
         query["scope"] += " bot"
-        query["permissions"] = int(permissions)
+        query["permissions"] = str(int(permissions))
         if guild:
             query["guild_id"] = guild
             query["disable_guild_select"] = "true"
@@ -115,14 +126,14 @@ async def oauth_callback(
         raise HTTPException(404, "State not found")
 
     if code is None:
-        return {
-            "redirect": redirect_target
-        }
+        return {"redirect": redirect_target}
 
     client_secret = os.getenv("SECRET_CLIENT")
+    if client_secret is None:
+        raise HTTPException(500, "Dont have client secret.")
     try:
         authtoken = await hikari.authorize_access_token(
-            client_id, client_secret, code, redirect_uri
+            int(client_id), client_secret, code, redirect_uri
         )
     except BadRequestError as e:
         print(e)
@@ -132,13 +143,13 @@ async def oauth_callback(
     try:
         async with hikari_rest.acquire(authtoken.access_token, "Bearer") as selfbot:
             auth = await selfbot.fetch_authorization()
-    
+
     except UnauthorizedError:
         raise HTTPException(401, "Very fast deauthorization you got there.")
 
-    if set(scopes) != set(auth.scopes):
+    if set(scopes) != set(auth.scopes) or auth.user is None:
         await database.delete(f"dash:oauth:state:{state}")
-        raise HTTPException(400, "Scope mismatch, very funny...")
+        raise HTTPException(400, "Scope mismatch")
 
     expires_after = 60 * 60 * 24 * 7
     expires = datetime.utcnow() + timedelta(seconds=expires_after)
@@ -163,7 +174,4 @@ async def oauth_callback(
     secret = os.getenv("SECRET_WEB_AUTH")
     token = jws.sign(data.encode(), secret, algorithm="HS256")
 
-    return {
-        "token": token,
-        "redirect": redirect_target.decode()
-    }
+    return {"token": token, "redirect": redirect_target.decode()}
