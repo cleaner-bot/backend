@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from cleaner_ratelimit import RatelimitMiddleware
@@ -8,7 +10,7 @@ from .shared import limiter
 
 
 app = FastAPI()
-load_dotenv("~/.cleaner/secrets")
+load_dotenv(Path("~/.cleaner/secrets").expanduser())
 
 origins = ["http://localhost:3000", "https://cleaner.leodev.xyz"]
 
