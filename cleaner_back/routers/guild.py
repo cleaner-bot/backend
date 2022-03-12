@@ -1,3 +1,4 @@
+import json
 import typing
 
 from coredis import StrictRedis  # type: ignore
@@ -106,7 +107,8 @@ async def patch_guild_config(
     for key, value in changes.items():
         await database.set(f"guild:{guild_id}:config:{key}", value)
 
-    # TODO: sync with bot
+    payload = {"guild_id": int(guild_id), "table": "config", "changes": changes}
+    await database.publish("pubsub:config-update", json.dumps(payload))
 
 
 @router.patch("/guild/{guild_id}/entitlement", status_code=204)
@@ -134,7 +136,8 @@ async def patch_guild_entitlement(
     for key, value in changes.items():
         await database.set(f"guild:{guild_id}:entitlement:{key}", value)
 
-    # TODO: sync with bot
+    payload = {"guild_id": int(guild_id), "table": "entitlements", "changes": changes}
+    await database.publish("pubsub:config-update", json.dumps(payload))
 
 
 @router.post("/guild/{guild_id}/challenge/embed", status_code=204)
