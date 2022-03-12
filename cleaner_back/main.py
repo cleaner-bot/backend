@@ -14,15 +14,6 @@ app = FastAPI()
 load_dotenv(Path("~/.cleaner/secrets").expanduser())
 
 
-sentry_dsn = os.getenv("SECRET_SENTRY_DSN")
-if sentry_dsn is not None:
-    import sentry_sdk
-    from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
-
-    sentry_sdk.init(dsn=sentry_dsn)
-    app.add_middleware(SentryAsgiMiddleware)
-
-
 origins = ["http://localhost:3000", "https://cleaner.leodev.xyz"]
 
 app.add_middleware(RatelimitMiddleware)
@@ -42,3 +33,12 @@ app.include_router(status.router)
 app.include_router(user.router)
 
 app.state.limiter = limiter
+
+
+sentry_dsn = os.getenv("SECRET_SENTRY_DSN")
+if sentry_dsn is not None:
+    import sentry_sdk
+    from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
+
+    sentry_sdk.init(dsn=sentry_dsn)
+    app = SentryAsgiMiddleware(app)
