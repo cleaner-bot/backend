@@ -1,4 +1,5 @@
 from pathlib import Path
+import os
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -11,6 +12,13 @@ from .shared import limiter
 
 app = FastAPI()
 load_dotenv(Path("~/.cleaner/secrets").expanduser())
+
+
+sentry_dsn = os.getenv("SECRET_SENTRY_DSN")
+if sentry_dsn is not None:
+    import sentry_sdk
+    sentry_sdk.init(dsn=sentry_dsn)
+
 
 origins = ["http://localhost:3000", "https://cleaner.leodev.xyz"]
 
