@@ -31,7 +31,7 @@ def with_asyncclient() -> AsyncClient:
 
 async def with_hikari(database: StrictRedis = Depends(with_database)):
     token = await database.get(os.getenv("SECRET_BOT_TOKEN"))
-    async with hikari_rest.acquire(token.decode(), "Bot") as restimpl:
+    async with hikari_rest.acquire(token, "Bot") as restimpl:
         yield restimpl
 
 
