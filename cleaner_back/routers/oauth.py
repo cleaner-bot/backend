@@ -17,7 +17,6 @@ router = APIRouter(tags=["oauth"])
 
 
 base = "/oauth2/authorize"
-client_id = "823533449717481492"  # TODO: put in secrets
 redirect_uri = "http://localhost:3000/oauth-comeback"
 response_type = "code"
 scopes = ["identify", "guilds", "email"]
@@ -69,6 +68,10 @@ async def oauth_redirect(
 
     state = os.urandom(64).hex()
     await database.set(f"dash:oauth:state:{state}", redirect_target, ex=600)
+
+    client_id = os.getenv("SECRET_CLIENT_ID")
+    if client_id is None:
+        raise HTTPException(500, "Configuration issue, please contact support.")
 
     query = {
         "client_id": client_id,
@@ -129,8 +132,10 @@ async def oauth_callback(
         return {"redirect": redirect_target}
 
     client_secret = os.getenv("SECRET_CLIENT")
-    if client_secret is None:
-        raise HTTPException(500, "Dont have client secret.")
+    client_id = os.getenv("SECRET_CLIENT_ID")
+    if client_secret is None or client_id is None:
+        raise HTTPException(500, "Configuration issue, please contact support.")
+
     try:
         authtoken = await hikari.authorize_access_token(
             int(client_id), client_secret, code, redirect_uri

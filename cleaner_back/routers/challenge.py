@@ -1,3 +1,5 @@
+import os
+
 from coredis import StrictRedis  # type: ignore
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 
@@ -73,12 +75,15 @@ async def post_challenge(
         raise HTTPException(400, "Expected or unexpected captcha token")
 
     if is_captcha:
-        # TODO: put secret in secrets
+        hcaptcha_secret = os.getenv("SECRET_HCAPTCHA")
+        hcaptcha_sitekey = os.getenv("SECRET_HCAPTCHA_SITEKEY")
+        if hcaptcha_secret is None or hcaptcha_sitekey is None:
+            raise HTTPException(500, "Configuration issue, please contact support.")
         res = await aclient.post(
             "https://hcaptcha.com/siteverify",
             data={
-                "secret": "0x9f4B368033ca2415edfcb7dCb355966a8468B159",
-                "sitekey": "10613019-10d8-4d66-a2fb-e83e6e6c80b7",
+                "secret": hcaptcha_secret,
+                "sitekey": hcaptcha_sitekey,
                 "response": captcha,
             },
         )
