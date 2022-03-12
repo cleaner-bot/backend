@@ -28,8 +28,9 @@ class GuildInfo(BaseModel):
     name: str
     icon: typing.Optional[str]
     is_owner: bool
-    is_added: bool
     is_admin: bool
+    is_added: bool
+    is_suspended: bool
 
 
 class UserInfo(BaseModel):

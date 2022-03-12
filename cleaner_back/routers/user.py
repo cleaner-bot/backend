@@ -3,6 +3,8 @@ import os
 from coredis import StrictRedis  # type: ignore
 from fastapi import APIRouter, Depends, Header, HTTPException
 
+from cleaner_conf.guild.entitlements import entitlements
+
 from .guild import get_guilds
 from ..shared import with_auth, with_database, limiter
 from ..models import GuildInfo
@@ -38,8 +40,6 @@ router = APIRouter(tags=["user"])
 @router.delete("/user/@me/sessions", status_code=204)
 @limiter.limit("2/5minute")
 async def user_me_delete_sessions(
-    request: Request,
-    response: Response,
     user_id: str = Depends(with_auth),
     database: StrictRedis = Depends(with_database),
 ):
@@ -52,8 +52,6 @@ async def user_me_delete_sessions(
 
 @router.get("/user/@me/guilds", response_model=list[GuildInfo])
 async def user_me_guilds(
-    request: Request,
-    response: Response,
     user_id: str = Depends(with_auth),
     database: StrictRedis = Depends(with_database),
 ):
@@ -61,7 +59,15 @@ async def user_me_guilds(
     for guild in guilds:
         guild_id = guild["id"]
         guild["is_added"] = await database.exists(f"guild:{guild_id}:sync:added")
+        suspended = await database.get(f"guild:{guild_id}:entitlement:suspended")
+        suspended_value = (
+            False
+            if suspended is None
+            else bool(entitlements["suspended"].from_string(suspended))
+        )
+        guild["is_suspended"] = suspended_value
     return guilds
+
 
 @router.post("/user/@me/remote-auth")
 @limiter.limit("5/1h")
