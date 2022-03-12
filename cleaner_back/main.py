@@ -41,4 +41,4 @@ if sentry_dsn is not None:
     from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 
     sentry_sdk.init(dsn=sentry_dsn)
-    app = SentryAsgiMiddleware(app)
+    app = SentryAsgiMiddleware(app)  # type: ignore
