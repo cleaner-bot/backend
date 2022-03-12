@@ -1,5 +1,7 @@
+import os
+
 from coredis import StrictRedis  # type: ignore
-from fastapi import APIRouter, Depends, Request, Response
+from fastapi import APIRouter, Depends, Header, HTTPException
 
 from .guild import get_guilds
 from ..shared import with_auth, with_database, limiter
@@ -60,3 +62,28 @@ async def user_me_guilds(
         guild_id = guild["id"]
         guild["is_added"] = await database.exists(f"guild:{guild_id}:sync:added")
     return guilds
+
+@router.post("/user/@me/remote-auth")
+@limiter.limit("5/1h")
+async def user_me_remote_auth(
+    x_token: str = Header(None),
+    user_id: str = Depends(with_auth),
+    database: StrictRedis = Depends(with_database),
+):
+    code = os.urandom(32).hex()
+    await database.set(f"remote-auth:{code}", x_token, ex=300)
+    return code
+
+
+@router.post("/remote-auth")
+@limiter.limit("5/1h")
+async def remote_auth(code: str, database: StrictRedis = Depends(with_database)):
+    if len(code) != 64 or not all(x in "0123456789abcdef" for x in code):
+        raise HTTPException(400, "Bad code")
+
+    token = await database.get(f"remote-auth:{code}")
+    if token is None:
+        raise HTTPException(404, "Code not found or expired.")
+    await database.delete(f"remote-auth:{code}")
+
+    return token
