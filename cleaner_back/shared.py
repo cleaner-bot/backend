@@ -10,7 +10,7 @@ from hikari import RESTApp, Permissions, UnauthorizedError
 from httpx import AsyncClient
 from jose import jws  # type: ignore
 
-from cleaner_conf import entitlements
+from cleaner_conf.guild.entitlements import entitlements
 from cleaner_ratelimit import Limiter, get_visitor_ip
 from cleaner_ratelimit.jail import Jail, CloudflareIPAccessRuleReporter
 

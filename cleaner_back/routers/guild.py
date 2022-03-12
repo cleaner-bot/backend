@@ -4,7 +4,9 @@ import typing
 from coredis import StrictRedis  # type: ignore
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 
-from cleaner_conf import entitlements, config, ValidationError
+from cleaner_conf import ValidationError
+from cleaner_conf.guild.config import config
+from cleaner_conf.guild.entitlements import entitlements
 from ..shared import (
     with_auth,
     with_database,
