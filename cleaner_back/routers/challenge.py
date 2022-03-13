@@ -91,5 +91,4 @@ async def post_challenge(
         if not data["success"]:
             raise HTTPException(400, "Invalid captcha token")
 
-    # verified
-    # TODO: hook up with bot
+    await database.publish("pubsub:challenge-verify", flow)
