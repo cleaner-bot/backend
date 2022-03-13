@@ -76,8 +76,10 @@ def is_developer(user_id: Union[int, str]) -> bool:
     return user_id in (633993042755452932, 918875640046964797, 922118393178517545)
 
 
-async def has_entitlement(database: StrictRedis, guild: str, entitlement: str) -> bool:
-    value = await database.get(f"guild:{guild}:entitlement:{entitlement}")
+async def has_entitlement(
+    database: StrictRedis, guild_id: str, entitlement: str
+) -> bool:
+    value = await database.get(f"guild:{guild_id}:entitlement:{entitlement}")
     if value is None:
         value = entitlements[entitlement].default
     else:
@@ -86,11 +88,21 @@ async def has_entitlement(database: StrictRedis, guild: str, entitlement: str) -
     if value == 0:
         return True
 
-    plan = await database.get(f"guild:{guild}:entitlement:plan")
+    plan = await database.get(f"guild:{guild_id}:entitlement:plan")
     if plan is None:
         return False
 
     return int(plan) >= value
+
+
+async def is_suspended(database: StrictRedis, guild_id: str) -> bool:
+    value = await database.get(f"guild:{guild_id}:entitlement:suspended")
+    if value is None:
+        value = entitlements["suspended"].default
+    else:
+        value = int(value)
+
+    return bool(value)
 
 
 get_guilds_lock: dict[str, asyncio.Event] = {}

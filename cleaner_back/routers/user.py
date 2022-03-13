@@ -3,10 +3,8 @@ import os
 from coredis import StrictRedis  # type: ignore
 from fastapi import APIRouter, Depends, Header, HTTPException
 
-from cleaner_conf.guild.entitlements import entitlements
-
 from .guild import get_guilds
-from ..shared import with_auth, with_database, limiter
+from ..shared import with_auth, with_database, limiter, is_suspended
 from ..models import GuildInfo
 
 
@@ -59,13 +57,7 @@ async def user_me_guilds(
     for guild in guilds:
         guild_id = guild["id"]
         guild["is_added"] = await database.exists(f"guild:{guild_id}:sync:added")
-        suspended = await database.get(f"guild:{guild_id}:entitlement:suspended")
-        suspended_value = (
-            False
-            if suspended is None
-            else bool(entitlements["suspended"].from_string(suspended))
-        )
-        guild["is_suspended"] = suspended_value
+        guild["is_suspended"] = await is_suspended(database, guild_id)
     return guilds
 
 
