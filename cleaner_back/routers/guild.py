@@ -13,6 +13,7 @@ from ..shared import (
     limiter,
     is_developer,
     has_entitlement,
+    is_suspended,
     get_guilds,
     get_userme,
 )
@@ -98,6 +99,9 @@ async def patch_guild_config(
 ):
     await check_guild(user_id, guild_id, database)
 
+    if not is_developer(user_id) and await is_suspended(database, guild_id):
+        raise HTTPException(403, "Guild is suspended")
+
     for key, value in changes.items():
         if key not in config:
             raise HTTPException(400, f"key not found: {key}")
@@ -126,6 +130,8 @@ async def patch_guild_entitlement(
 
     if not is_developer(user_id):
         raise HTTPException(403, "Not developer")
+    elif await is_suspended(database, guild_id):
+        raise HTTPException(403, "Guild is suspended")
 
     for key, value in changes.items():
         if key not in entitlements:
@@ -152,6 +158,10 @@ async def post_guild_challenge_embed(
     user_id: str = Depends(with_auth),
     database: StrictRedis = Depends(with_database),
 ):
+    await check_guild(user_id, guild_id, database)
+
+    if await is_suspended(database, guild_id):
+        raise HTTPException(403, "Guild is suspended")
     raise HTTPException(500, "TODO")
 
 
@@ -167,7 +177,9 @@ async def get_guild_logging_downloads(
 ):
     await check_guild(user_id, guild_id, database)
 
-    if not await has_entitlement(database, guild_id, "logging_downloads"):
+    if await is_suspended(database, guild_id):
+        raise HTTPException(403, "Guild is suspended")
+    elif not await has_entitlement(database, guild_id, "logging_downloads"):
         raise HTTPException(
             403, "Guild does not have the 'logging_downloads' entitlement"
         )
