@@ -141,7 +141,6 @@ async def oauth_callback(
             int(client_id), client_secret, code, redirect_uri
         )
     except BadRequestError as e:
-        print(e)
         await database.delete(f"dash:oauth:state:{state}")
         raise HTTPException(400, "Invalid code")
 
