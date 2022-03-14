@@ -10,6 +10,7 @@ from hikari import RESTApp, Permissions, UnauthorizedError
 from httpx import AsyncClient
 from jose import jws  # type: ignore
 
+from cleaner_conf.guild.config import config
 from cleaner_conf.guild.entitlements import entitlements
 from cleaner_ratelimit import Limiter, get_visitor_ip
 from cleaner_ratelimit.jail import Jail, CloudflareIPAccessRuleReporter
@@ -101,6 +102,13 @@ async def is_suspended(database: StrictRedis, guild_id: str) -> bool:
         value = int(value)
 
     return bool(value)
+
+
+async def get_config(database: StrictRedis, guild_id: str, name: str):
+    value = await database.get(f"guild:{guild_id}:config:{name}")
+    if value is None:
+        return config[name].default
+    return config[name].from_string(value)
 
 
 get_guilds_lock: dict[str, asyncio.Event] = {}

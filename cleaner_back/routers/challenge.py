@@ -10,6 +10,7 @@ from ..shared import (
     with_database,
     aclient,
     has_entitlement,
+    get_config,
 )
 
 
@@ -59,10 +60,13 @@ async def post_challenge(
     if len(flow) != 64 or not all(x in "0123456789abcdef" for x in flow):
         raise HTTPException(400, "Invalid flow")
     user_id = await database.get(f"challenge:flow:{flow}:user")
+    guild_id = await database.get(f"challenge:flow:{flow}:guild")
     if user_id is None:
         raise HTTPException(404, "Flow not found")
 
-    # TODO: check if challenges are even enabled
+    if not get_config(database, int(guild_id), "challenge_interactive_enabled"):
+        await database.delete(f"challenge:flow:{flow}:user")
+        raise HTTPException(400, "Guild does not have interactive challenges enabled.")
 
     is_captcha = await database.exists(f"challenge:flow:{flow}:captcha")
 
