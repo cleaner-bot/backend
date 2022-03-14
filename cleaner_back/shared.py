@@ -36,8 +36,7 @@ async def with_hikari(database: StrictRedis = Depends(with_database)):
 
 
 async def with_auth(
-    x_token: str = Header(None),
-    database: StrictRedis = Depends(with_database),
+    x_token: str = Header(None), database: StrictRedis = Depends(with_database)
 ):
     if x_token is None:
         raise HTTPException(401, "Missing X-Token header")
@@ -61,8 +60,7 @@ async def with_auth(
 
 
 async def with_optional_auth(
-    x_token: str = Header(None),
-    database: StrictRedis = Depends(with_database),
+    x_token: str = Header(None), database: StrictRedis = Depends(with_database)
 ):
     try:
         return await with_auth(x_token, database)

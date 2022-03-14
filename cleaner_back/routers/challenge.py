@@ -1,7 +1,7 @@
 import os
 
 from coredis import StrictRedis  # type: ignore
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, HTTPException
 
 
 from ..shared import (
@@ -18,8 +18,6 @@ router = APIRouter(tags=["guild"])
 
 @router.get("/challenge")
 async def get_challenge(
-    request: Request,
-    response: Response,
     flow: str,
     auth_user_id: str = Depends(with_optional_auth),
     database: StrictRedis = Depends(with_database),
@@ -53,8 +51,6 @@ async def get_challenge(
 
 @router.post("/challenge", status_code=204)
 async def post_challenge(
-    request: Request,
-    response: Response,
     flow: str,
     captcha: str = None,
     auth_user_id: str = Depends(with_auth),
@@ -65,6 +61,8 @@ async def post_challenge(
     user_id = await database.get(f"challenge:flow:{flow}:user")
     if user_id is None:
         raise HTTPException(404, "Flow not found")
+
+    # TODO: check if challenges are even enabled
 
     is_captcha = await database.exists(f"challenge:flow:{flow}:captcha")
 

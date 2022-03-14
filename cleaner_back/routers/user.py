@@ -14,8 +14,6 @@ router = APIRouter(tags=["user"])
 # @router.get("/user/@me", response_model=UserInfo)
 # @limiter.limit("5/5")
 # async def user_me(
-#     request: Request,
-#     response: Response,
 #     user_id: str = Depends(with_auth),
 #     database: StrictRedis = Depends(with_database),
 # ):
@@ -25,8 +23,6 @@ router = APIRouter(tags=["user"])
 # @router.get("/user/@me/account", response_model=Account)
 # @limiter.limit("5/5")
 # async def user_me_account(
-#     request: Request,
-#     response: Response,
 #     user_id: str = Depends(with_auth),
 #     database: StrictRedis = Depends(with_database),
 # ):
@@ -38,8 +34,7 @@ router = APIRouter(tags=["user"])
 @router.delete("/user/@me/sessions", status_code=204)
 @limiter.limit("2/5minute")
 async def user_me_delete_sessions(
-    user_id: str = Depends(with_auth),
-    database: StrictRedis = Depends(with_database),
+    user_id: str = Depends(with_auth), database: StrictRedis = Depends(with_database)
 ):
     sessions = []
     async for session in database.scan_iter(f"user:{user_id}:dash:session:*"):
@@ -50,8 +45,7 @@ async def user_me_delete_sessions(
 
 @router.get("/user/@me/guilds", response_model=list[GuildInfo])
 async def user_me_guilds(
-    user_id: str = Depends(with_auth),
-    database: StrictRedis = Depends(with_database),
+    user_id: str = Depends(with_auth), database: StrictRedis = Depends(with_database)
 ):
     guilds = await get_guilds(database, user_id)
     for guild in guilds:

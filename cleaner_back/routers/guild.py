@@ -2,7 +2,7 @@ import json
 import typing
 
 from coredis import StrictRedis  # type: ignore
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, HTTPException
 
 from cleaner_conf import ValidationError
 from cleaner_conf.guild.config import config
@@ -33,8 +33,6 @@ async def check_guild(user_id: str, guild_id: str, database: StrictRedis):
 
 @router.get("/guild/{guild_id}", response_model=DetailedGuildInfo)
 async def get_guild(
-    request: Request,
-    response: Response,
     guild_id: str,
     user_id: str = Depends(with_auth),
     database: StrictRedis = Depends(with_database),
@@ -88,8 +86,6 @@ async def get_guild(
 
 @router.patch("/guild/{guild_id}/config", status_code=204)
 async def patch_guild_config(
-    request: Request,
-    response: Response,
     guild_id: str,
     changes: typing.Dict[str, str],
     user_id: str = Depends(with_auth),
@@ -117,8 +113,6 @@ async def patch_guild_config(
 
 @router.patch("/guild/{guild_id}/entitlement", status_code=204)
 async def patch_guild_entitlement(
-    request: Request,
-    response: Response,
     guild_id: str,
     changes: typing.Dict[str, str],
     user_id: str = Depends(with_auth),
@@ -159,18 +153,16 @@ async def post_guild_challenge_embed(
     if await is_suspended(database, guild_id):
         raise HTTPException(403, "Guild is suspended")
 
-    await database.publish("pubsub:challenge-send", json.dumps({
-        "guild": guild_id,
-        "channel": request.channel_id
-    }))
+    await database.publish(
+        "pubsub:challenge-send",
+        json.dumps({"guild": guild_id, "channel": request.channel_id}),
+    )
 
 
 @router.get(
     "/guild/{guild_id}/logging/downloads", response_model=typing.List[DownloadInfo]
 )
 async def get_guild_logging_downloads(
-    request: Request,
-    response: Response,
     guild_id: str,
     user_id: str = Depends(with_auth),
     database: StrictRedis = Depends(with_database),

@@ -3,7 +3,7 @@ import os
 from urllib.parse import urlencode
 
 from coredis import StrictRedis  # type: ignore
-from fastapi import APIRouter, Depends, Request, Response, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import RedirectResponse
 from hikari import BadRequestError, UnauthorizedError, Permissions
 from hikari.urls import BASE_URL
@@ -40,8 +40,6 @@ allowed_components = (
 
 @router.get("/oauth/redirect", response_class=RedirectResponse)
 async def oauth_redirect(
-    request: Request,
-    response: Response,
     bot: bool = False,
     with_admin: bool = False,
     guild: str = None,
@@ -111,8 +109,6 @@ async def oauth_redirect(
 @router.post("/oauth/callback")
 @limiter.limit("2/1s", "4/10s")
 async def oauth_callback(
-    request: Request,
-    response: Response,
     code: str = None,
     state: str = None,
     database: StrictRedis = Depends(with_database),

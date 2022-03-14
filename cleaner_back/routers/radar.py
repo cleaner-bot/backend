@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Request, Response
+from fastapi import APIRouter, Request
 
 from ..models import RadarInfo
 
@@ -7,10 +7,7 @@ router = APIRouter()
 
 
 @router.get("/radar", response_model=RadarInfo)
-async def get_radar(
-    request: Request,
-    response: Response,
-):
+async def get_radar():
     # TODO
     return {
         "rules": {
