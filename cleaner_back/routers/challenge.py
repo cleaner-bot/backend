@@ -64,7 +64,7 @@ async def post_challenge(
     if user_id is None:
         raise HTTPException(404, "Flow not found")
 
-    if not get_config(database, int(guild_id), "challenge_interactive_enabled"):
+    if not await get_config(database, int(guild_id), "challenge_interactive_enabled"):
         await database.delete(f"challenge:flow:{flow}:user")
         raise HTTPException(400, "Guild does not have interactive challenges enabled.")
 
