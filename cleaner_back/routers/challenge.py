@@ -67,7 +67,7 @@ async def post_challenge(
 
     if not await get_config(database, int(guild_id), "challenge_interactive_enabled"):
         await database.delete(f"challenge:flow:{flow}:user")
-        raise HTTPException(400, "Guild does not have interactive challenges enabled.")
+        raise HTTPException(400, "Guild does not have interactive challenges enabled")
 
     is_captcha = await database.exists(f"challenge:flow:{flow}:captcha")
 
@@ -81,7 +81,7 @@ async def post_challenge(
         hcaptcha_secret = os.getenv("SECRET_HCAPTCHA")
         hcaptcha_sitekey = os.getenv("SECRET_HCAPTCHA_SITEKEY")
         if hcaptcha_secret is None or hcaptcha_sitekey is None:
-            raise HTTPException(500, "Configuration issue, please contact support.")
+            raise HTTPException(500, "Configuration issue, please contact support")
         res = await aclient.post(
             "https://hcaptcha.com/siteverify",
             data={

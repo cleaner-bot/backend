@@ -69,7 +69,7 @@ async def oauth_redirect(
 
     client_id = os.getenv("SECRET_CLIENT_ID")
     if client_id is None:
-        raise HTTPException(500, "Configuration issue, please contact support.")
+        raise HTTPException(500, "Configuration issue, please contact support")
 
     query = {
         "client_id": client_id,
@@ -130,7 +130,7 @@ async def oauth_callback(
     client_secret = os.getenv("SECRET_CLIENT")
     client_id = os.getenv("SECRET_CLIENT_ID")
     if client_secret is None or client_id is None:
-        raise HTTPException(500, "Configuration issue, please contact support.")
+        raise HTTPException(500, "Configuration issue, please contact support")
 
     try:
         authtoken = await hikari.authorize_access_token(
@@ -145,7 +145,7 @@ async def oauth_callback(
             auth = await selfbot.fetch_authorization()
 
     except UnauthorizedError:
-        raise HTTPException(401, "Very fast deauthorization you got there.")
+        raise HTTPException(401, "Very fast deauthorization you got there")
 
     if set(scopes) != set(auth.scopes) or auth.user is None:
         await database.delete(f"dash:oauth:state:{state}")
