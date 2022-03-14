@@ -59,9 +59,9 @@ class GIMyself(BaseModel):
 class GIGuild(BaseModel):
     id: str
     name: str
-    roles: typing.List[GIRole]
-    channels: typing.List[GIChannel]
-    me: GIMyself
+    roles: typing.Optional[typing.List[GIRole]]
+    channels: typing.Optional[typing.List[GIChannel]]
+    myself: typing.Optional[GIMyself]
 
 
 class GIUser(BaseModel):

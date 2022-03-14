@@ -46,7 +46,7 @@ async def get_guild(
 
     user = await get_userme(database, user_id)
     if is_developer(user_id):
-        user["is_dev"] = False
+        user["is_dev"] = True
 
     if not await database.exists(f"guild:{guild_id}:sync:added"):
         guild = None
@@ -69,18 +69,16 @@ async def get_guild(
         if not value.hidden
     }
 
+    data = {}
+    for x in ("roles", "channels", "myself"):
+        loaded = await database.get(f"guild:{guild_id}:sync:{x}")
+        data[x] = None if loaded is None else json.loads(loaded)
+
     return {
         "guild": {
+            **data,
             "id": guild["id"],
             "name": guild["name"],
-            "roles": [
-                {"name": "test", "id": "1", "can_control": True, "is_managed": False},
-                {"name": "test2", "id": "2", "can_control": True, "is_managed": False},
-                {"name": "bot", "id": "3", "can_control": False, "is_managed": True},
-                {"name": "test3", "id": "4", "can_control": False, "is_managed": False},
-            ],
-            "channels": [],
-            "me": {"permissions": {"administrator": True}},
         },
         "entitlements": guild_entitlements,
         "config": guild_config,
