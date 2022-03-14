@@ -140,7 +140,7 @@ async def oauth_callback(
         authtoken = await hikari.authorize_access_token(
             int(client_id), client_secret, code, redirect_uri
         )
-    except BadRequestError as e:
+    except BadRequestError:
         await database.delete(f"dash:oauth:state:{state}")
         raise HTTPException(400, "Invalid code")
 
