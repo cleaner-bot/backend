@@ -17,7 +17,7 @@ from ..shared import (
     get_guilds,
     get_userme,
 )
-from ..models import DetailedGuildInfo, DownloadInfo
+from ..models import DetailedGuildInfo, DownloadInfo, ChannelId
 
 
 router = APIRouter(tags=["guild"])
@@ -146,13 +146,11 @@ async def patch_guild_entitlement(
     await database.publish("pubsub:config-update", json.dumps(payload))
 
 
-@router.post("/guild/{guild_id}/challenge/embed", status_code=204)
+@router.post("/guild/{guild_id}/challenge-embed", status_code=204)
 @limiter.limit("2/10s")
 async def post_guild_challenge_embed(
-    request: Request,
-    response: Response,
     guild_id: str,
-    channel: str,
+    request: ChannelId,
     user_id: str = Depends(with_auth),
     database: StrictRedis = Depends(with_database),
 ):
@@ -160,7 +158,11 @@ async def post_guild_challenge_embed(
 
     if await is_suspended(database, guild_id):
         raise HTTPException(403, "Guild is suspended")
-    raise HTTPException(500, "TODO")
+
+    await database.publish("pubsub:challenge-send", json.dumps({
+        "guild": guild_id,
+        "channel": request.channel_id
+    }))
 
 
 @router.get(

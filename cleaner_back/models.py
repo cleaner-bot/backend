@@ -82,3 +82,7 @@ class DownloadInfo(BaseModel):
     year: int
     month: int
     expired: bool
+
+
+class ChannelId(BaseModel):
+    channel_id: int
