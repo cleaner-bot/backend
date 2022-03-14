@@ -8,7 +8,7 @@ from ..shared import with_auth, with_database, limiter, is_suspended
 from ..models import GuildInfo
 
 
-router = APIRouter(tags=["user"])
+router = APIRouter()
 
 
 # @router.get("/user/@me", response_model=UserInfo)

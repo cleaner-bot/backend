@@ -13,7 +13,7 @@ from ..shared import (
 )
 
 
-router = APIRouter(tags=["guild"])
+router = APIRouter()
 
 
 @router.get("/challenge")

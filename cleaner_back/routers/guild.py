@@ -20,7 +20,7 @@ from ..shared import (
 from ..models import DetailedGuildInfo, DownloadInfo, ChannelId
 
 
-router = APIRouter(tags=["guild"])
+router = APIRouter()
 
 
 async def check_guild(user_id: str, guild_id: str, database: StrictRedis):

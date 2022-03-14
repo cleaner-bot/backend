@@ -13,7 +13,7 @@ from jose import jws  # type: ignore
 from ..shared import with_database, with_hikari, hikari_rest, home, limiter
 
 
-router = APIRouter(tags=["oauth"])
+router = APIRouter()
 
 
 base = "/oauth2/authorize"
