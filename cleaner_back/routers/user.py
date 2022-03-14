@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException
 
 from .guild import get_guilds
 from ..shared import with_auth, with_database, limiter, is_suspended
-from ..models import GuildInfo
+from ..models import GuildInfo, RemoteAuth
 
 
 router = APIRouter()
@@ -69,13 +69,14 @@ async def user_me_remote_auth(
 
 @router.post("/remote-auth")
 @limiter.limit("5/1h")
-async def remote_auth(code: str, database: StrictRedis = Depends(with_database)):
+async def remote_auth(auth: RemoteAuth, database: StrictRedis = Depends(with_database)):
+    code = auth.code
     if len(code) != 64 or not all(x in "0123456789abcdef" for x in code):
         raise HTTPException(400, "Bad code")
 
     token = await database.get(f"remote-auth:{code}")
     if token is None:
-        raise HTTPException(404, "Code not found or expired.")
+        raise HTTPException(404, "Code not found or expired")
     await database.delete(f"remote-auth:{code}")
 
     return token

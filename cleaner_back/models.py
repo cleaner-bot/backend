@@ -84,5 +84,14 @@ class DownloadInfo(BaseModel):
     expired: bool
 
 
+class Challenge(BaseModel):
+    flow: str
+    captcha: typing.Optional[str]
+
+
 class ChannelId(BaseModel):
     channel_id: int
+
+
+class RemoteAuth(BaseModel):
+    code: str

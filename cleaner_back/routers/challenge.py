@@ -12,6 +12,7 @@ from ..shared import (
     has_entitlement,
     get_config,
 )
+from ..models import Challenge
 
 
 router = APIRouter()
@@ -52,11 +53,11 @@ async def get_challenge(
 
 @router.post("/challenge", status_code=204)
 async def post_challenge(
-    flow: str,
-    captcha: str = None,
+    challenge: Challenge,
     auth_user_id: str = Depends(with_auth),
     database: StrictRedis = Depends(with_database),
 ):
+    flow = challenge.flow
     if len(flow) != 64 or not all(x in "0123456789abcdef" for x in flow):
         raise HTTPException(400, "Invalid flow")
     user_id = await database.get(f"challenge:flow:{flow}:user")
@@ -73,7 +74,7 @@ async def post_challenge(
     if auth_user_id != user_id.decode():
         raise HTTPException(403, "Wrong user account")
 
-    if (captcha is None) == is_captcha:
+    if (challenge.captcha is None) == is_captcha:
         raise HTTPException(400, "Expected or unexpected captcha token")
 
     if is_captcha:
@@ -86,7 +87,7 @@ async def post_challenge(
             data={
                 "secret": hcaptcha_secret,
                 "sitekey": hcaptcha_sitekey,
-                "response": captcha,
+                "response": challenge.captcha,
             },
         )
         data = res.json()
