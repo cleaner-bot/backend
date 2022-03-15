@@ -122,8 +122,6 @@ async def patch_guild_entitlement(
 
     if not is_developer(user_id):
         raise HTTPException(403, "Not developer")
-    elif await is_suspended(database, guild_id):
-        raise HTTPException(403, "Guild is suspended")
 
     for key, value in changes.items():
         if key not in entitlements:
