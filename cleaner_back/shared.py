@@ -108,7 +108,7 @@ async def get_config(database: StrictRedis, guild_id: str, name: str):
     value = await database.get(f"guild:{guild_id}:config:{name}")
     if value is None:
         return config[name].default
-    return config[name].from_string(value)
+    return config[name].from_string(value.decode())
 
 
 get_guilds_lock: dict[str, asyncio.Event] = {}

@@ -153,7 +153,7 @@ async def post_guild_challenge_embed(
 
     await database.publish(
         "pubsub:challenge-send",
-        json.dumps({"guild": guild_id, "channel": request.channel_id}),
+        json.dumps({"guild": int(guild_id), "channel": request.channel_id}),
     )
 
 
