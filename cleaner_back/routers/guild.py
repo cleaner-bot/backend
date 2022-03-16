@@ -36,7 +36,7 @@ async def check_guild(user_id: str, guild_id: str, database: StrictRedis):
             "icon": None,
             "is_owner": True,
             "is_admin": True,
-            "has_access": False
+            "has_access": False,
         }
 
     raise HTTPException(404, "Guild not found")
