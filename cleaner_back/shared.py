@@ -69,12 +69,6 @@ async def with_optional_auth(
         return None
 
 
-def is_developer(user_id: Union[int, str]) -> bool:
-    if isinstance(user_id, str):
-        user_id = int(user_id)
-    return user_id in (633993042755452932, 918875640046964797, 922118393178517545)
-
-
 async def has_entitlement(
     database: StrictRedis, guild_id: str, entitlement: str
 ) -> bool:

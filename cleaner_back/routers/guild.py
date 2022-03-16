@@ -7,11 +7,11 @@ from fastapi import APIRouter, Depends, HTTPException
 from cleaner_conf import ValidationError
 from cleaner_conf.guild.config import config
 from cleaner_conf.guild.entitlements import entitlements
+from ..access import has_access, Access
 from ..shared import (
     with_auth,
     with_database,
     limiter,
-    is_developer,
     has_entitlement,
     is_suspended,
     get_guilds,
@@ -28,6 +28,17 @@ async def check_guild(user_id: str, guild_id: str, database: StrictRedis):
     for guild in guilds:
         if guild["id"] == guild_id:
             return guild
+
+    if has_access(user_id) and await database.exists(f"guild:{guild_id}:sync:added"):
+        return {
+            "id": guild_id,
+            "name": "Placeholder",
+            "icon": None,
+            "is_owner": True,
+            "is_admin": True,
+            "has_access": False
+        }
+
     raise HTTPException(404, "Guild not found")
 
 
@@ -43,7 +54,7 @@ async def get_guild(
         guild = None
 
     user = await get_userme(database, user_id)
-    if is_developer(user_id):
+    if has_access(user_id):
         user["is_dev"] = True
 
     if not await database.exists(
@@ -95,7 +106,7 @@ async def patch_guild_config(
 ):
     await check_guild(user_id, guild_id, database)
 
-    if not is_developer(user_id):
+    if not has_access(user_id):
         if await is_suspended(database, guild_id):
             raise HTTPException(403, "Guild is suspended")
         elif not await database.exists(f"guild:{guild_id}:sync:added"):
@@ -125,8 +136,8 @@ async def patch_guild_entitlement(
 ):
     await check_guild(user_id, guild_id, database)
 
-    if not is_developer(user_id):
-        raise HTTPException(403, "Not developer")
+    if not has_access(user_id, Access.DEVELOPER):
+        raise HTTPException(403, "No access")
 
     for key, value in changes.items():
         if key not in entitlements:
