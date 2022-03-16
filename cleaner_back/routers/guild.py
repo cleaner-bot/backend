@@ -46,8 +46,9 @@ async def get_guild(
     if is_developer(user_id):
         user["is_dev"] = True
 
-    # TODO: :sync:added check MUST be added to all endpoints
-    if not await database.exists(f"guild:{guild_id}:sync:added") and not await is_suspended(database, guild_id):
+    if not await database.exists(
+        f"guild:{guild_id}:sync:added"
+    ) and not await is_suspended(database, guild_id):
         guild = None
 
     if guild is None:
@@ -94,8 +95,11 @@ async def patch_guild_config(
 ):
     await check_guild(user_id, guild_id, database)
 
-    if not is_developer(user_id) and await is_suspended(database, guild_id):
-        raise HTTPException(403, "Guild is suspended")
+    if not is_developer(user_id):
+        if await is_suspended(database, guild_id):
+            raise HTTPException(403, "Guild is suspended")
+        elif not await database.exists(f"guild:{guild_id}:sync:added"):
+            raise HTTPException(404, "Guild not found")
 
     for key, value in changes.items():
         if key not in config:
@@ -151,6 +155,8 @@ async def post_guild_challenge_embed(
 
     if await is_suspended(database, guild_id):
         raise HTTPException(403, "Guild is suspended")
+    elif not await database.exists(f"guild:{guild_id}:sync:added"):
+        raise HTTPException(404, "Guild not found")
 
     await database.publish(
         "pubsub:challenge-send",
@@ -170,6 +176,8 @@ async def get_guild_logging_downloads(
 
     if await is_suspended(database, guild_id):
         raise HTTPException(403, "Guild is suspended")
+    elif not await database.exists(f"guild:{guild_id}:sync:added"):
+        raise HTTPException(404, "Guild not found")
     elif not await has_entitlement(database, guild_id, "logging_downloads"):
         raise HTTPException(
             403, "Guild does not have the 'logging_downloads' entitlement"

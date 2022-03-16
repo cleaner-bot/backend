@@ -29,7 +29,16 @@ async def get_challenge(
     user_id = await database.get(f"challenge:flow:{flow}:user")
     if user_id is None:
         raise HTTPException(404, "Flow not found")
+
     guild_id = await database.get(f"challenge:flow:{flow}:guild")
+
+    if not await database.exists(f"guild:{guild_id}:sync:added"):
+        raise HTTPException(404, "Guild not found")
+    elif not await get_config(
+        database, guild_id.decode(), "challenge_interactive_enabled"
+    ):
+        await database.delete(f"challenge:flow:{flow}:user")
+        raise HTTPException(400, "Guild does not have interactive challenges enabled")
 
     is_captcha = await database.exists(f"challenge:flow:{flow}:captcha")
 
@@ -65,10 +74,12 @@ async def post_challenge(
     if user_id is None or guild_id is None:
         raise HTTPException(404, "Flow not found")
 
-    if not await get_config(
+    if not await database.exists(f"guild:{guild_id}:sync:added"):
+        raise HTTPException(404, "Guild not found")
+    elif not await get_config(
         database, guild_id.decode(), "challenge_interactive_enabled"
     ):
-        # await database.delete(f"challenge:flow:{flow}:user")
+        await database.delete(f"challenge:flow:{flow}:user")
         raise HTTPException(400, "Guild does not have interactive challenges enabled")
 
     is_captcha = await database.exists(f"challenge:flow:{flow}:captcha")
