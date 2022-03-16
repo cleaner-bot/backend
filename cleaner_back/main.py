@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from cleaner_ratelimit import RatelimitMiddleware
 from dotenv import load_dotenv
 
-from .routers import challenge, guild, oauth, radar, status, user
+from .routers import challenge, guild, oauth, radar, user
 from .shared import limiter
 
 
@@ -29,7 +29,6 @@ app.include_router(challenge.router)
 app.include_router(guild.router)
 app.include_router(oauth.router)
 app.include_router(radar.router)
-app.include_router(status.router)
 app.include_router(user.router)
 
 app.state.limiter = limiter
