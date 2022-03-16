@@ -2,7 +2,6 @@ import asyncio
 import json
 from datetime import datetime
 import os
-from typing import Union
 
 from coredis import StrictRedis  # type: ignore
 from fastapi import Depends, HTTPException, Header

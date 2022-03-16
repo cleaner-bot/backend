@@ -16,4 +16,3 @@ async def get_radar(database: StrictRedis = Depends(with_database)):
     if data is None:
         raise HTTPException(500, "No data available currently.")
     return json.loads(data)
-    
