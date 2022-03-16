@@ -9,18 +9,10 @@ class RadarStat(BaseModel):
 
 
 class RadarInfo(BaseModel):
-    stats_phishing: RadarStat
-    stats_antispam: RadarStat
-    stats_advertisement: RadarStat
-    stats_other: RadarStat
     rules: typing.Dict[str, RadarStat]
     traffic: typing.Dict[str, RadarStat]
-    challenges_ban: RadarStat
-    challenges_auth: RadarStat
-    challenges_captcha: RadarStat
-    challenges_timeout: RadarStat
-
-    last_data: str
+    categories: typing.Dict[str, RadarStat]
+    challenges: typing.Dict[str, RadarStat]
 
 
 class GuildInfo(BaseModel):
