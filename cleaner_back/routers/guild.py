@@ -46,7 +46,8 @@ async def get_guild(
     if is_developer(user_id):
         user["is_dev"] = True
 
-    if not await database.exists(f"guild:{guild_id}:sync:added"):
+    # TODO: :sync:added check MUST be added to all endpoints
+    if not await database.exists(f"guild:{guild_id}:sync:added") and not await is_suspended(database, guild_id):
         guild = None
 
     if guild is None:
