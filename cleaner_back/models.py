@@ -1,5 +1,3 @@
-import typing
-
 from pydantic import BaseModel
 
 
@@ -9,17 +7,17 @@ class RadarStat(BaseModel):
 
 
 class RadarInfo(BaseModel):
-    rules: typing.Dict[str, RadarStat]
-    traffic: typing.Dict[str, RadarStat]
-    categories: typing.Dict[str, RadarStat]
-    challenges: typing.Dict[str, RadarStat]
-    stats: typing.Dict[str, int]
+    rules: dict[str, RadarStat]
+    traffic: dict[str, RadarStat]
+    categories: dict[str, RadarStat]
+    challenges: dict[str, RadarStat]
+    stats: dict[str, int]
 
 
 class GuildInfo(BaseModel):
     id: str
     name: str
-    icon: typing.Optional[str]
+    icon: str | None
     is_owner: bool
     is_admin: bool
     is_added: bool
@@ -29,7 +27,7 @@ class GuildInfo(BaseModel):
 class UserInfo(BaseModel):
     id: str
     name: str
-    avatar: typing.Optional[str]
+    avatar: str | None
 
 
 class GIRole(BaseModel):
@@ -42,32 +40,32 @@ class GIRole(BaseModel):
 class GIChannel(BaseModel):
     name: str
     id: str
-    permissions: typing.Dict[str, bool]
+    permissions: dict[str, bool]
 
 
 class GIMyself(BaseModel):
-    permissions: typing.Dict[str, bool]
+    permissions: dict[str, bool]
 
 
 class GIGuild(BaseModel):
     id: str
     name: str
-    roles: typing.Optional[typing.List[GIRole]]
-    channels: typing.Optional[typing.List[GIChannel]]
-    myself: typing.Optional[GIMyself]
+    roles: list[GIRole] | None
+    channels: list[GIChannel] | None
+    myself: GIMyself | None
 
 
 class GIUser(BaseModel):
     id: str
     name: str
     avatar: str
-    is_dev: typing.Optional[bool]
+    is_dev: bool | None
 
 
 class DetailedGuildInfo(BaseModel):
-    guild: typing.Optional[GIGuild]
-    entitlements: typing.Optional[typing.Dict[str, typing.Union[int, bool]]]
-    config: typing.Optional[typing.Dict[str, str]]
+    guild: GIGuild | None
+    entitlements: dict[str, int | bool] | None
+    config: dict[str, str] | None
     user: GIUser
 
 
@@ -79,7 +77,7 @@ class DownloadInfo(BaseModel):
 
 class Challenge(BaseModel):
     flow: str
-    captcha: typing.Optional[str]
+    captcha: str | None
 
 
 class ChannelId(BaseModel):

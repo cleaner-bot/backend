@@ -1,5 +1,4 @@
 import json
-import typing
 
 from coredis import StrictRedis  # type: ignore
 from fastapi import APIRouter, Depends, HTTPException
@@ -100,7 +99,7 @@ async def get_guild(
 @router.patch("/guild/{guild_id}/config", status_code=204)
 async def patch_guild_config(
     guild_id: str,
-    changes: typing.Dict[str, str],
+    changes: dict[str, str],
     user_id: str = Depends(with_auth),
     database: StrictRedis = Depends(with_database),
 ):
@@ -130,7 +129,7 @@ async def patch_guild_config(
 @router.patch("/guild/{guild_id}/entitlement", status_code=204)
 async def patch_guild_entitlement(
     guild_id: str,
-    changes: typing.Dict[str, str],
+    changes: dict[str, str],
     user_id: str = Depends(with_auth),
     database: StrictRedis = Depends(with_database),
 ):
@@ -175,9 +174,7 @@ async def post_guild_challenge_embed(
     )
 
 
-@router.get(
-    "/guild/{guild_id}/logging/downloads", response_model=typing.List[DownloadInfo]
-)
+@router.get("/guild/{guild_id}/logging/downloads", response_model=list[DownloadInfo])
 async def get_guild_logging_downloads(
     guild_id: str,
     user_id: str = Depends(with_auth),
