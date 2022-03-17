@@ -15,7 +15,7 @@ from cleaner_ratelimit import Limiter, get_visitor_ip
 from cleaner_ratelimit.jail import Jail, CloudflareIPAccessRuleReporter
 
 
-home = "http://localhost:3000"
+home = "https://cleaner-beta.leodev.xyz"
 redis = StrictRedis()
 aclient = AsyncClient(headers={"user-agent": "CleanerBot (cleaner.leodev.xyz 0.1.0)"})
 hikari_rest = RESTApp()
@@ -202,15 +202,15 @@ limiter = Limiter(key_func=get_visitor_ip, global_limits=["10/s", "50/10s", "100
 
 reporter = None
 
-if (cf_email := os.getenv("SECRET_CF_EMAIL")) and (
-    cf_token := os.getenv("SECRET_CF_TOKEN")
-):
+cf_email = os.getenv("SECRET_CF_EMAIL")
+cf_key = os.getenv("SECRET_CF_KEY")
+if cf_email is not None and cf_key is not None:
     zone = os.getenv("SECRET_CF_ZONE")
     reporter = CloudflareIPAccessRuleReporter(
         cf_email,
-        cf_token,
+        cf_key,
         zone,
         "Banned for exceeding ratelimits on cleaner.leodev.xyz/api",
     )
 
-limiter.jail = Jail(get_visitor_ip, "50/1m", reporter)
+limiter.jail = Jail(get_visitor_ip, "50/5m", reporter)

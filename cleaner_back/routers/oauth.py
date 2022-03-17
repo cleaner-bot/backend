@@ -17,7 +17,7 @@ router = APIRouter()
 
 
 base = "/oauth2/authorize"
-redirect_uri = "http://localhost:3000/oauth-comeback"
+redirect_uri = "https://cleaner-beta.leodev.xyz/oauth-comeback"
 response_type = "code"
 scopes = ["identify", "guilds", "email"]
 
