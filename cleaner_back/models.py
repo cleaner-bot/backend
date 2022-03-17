@@ -13,6 +13,7 @@ class RadarInfo(BaseModel):
     traffic: typing.Dict[str, RadarStat]
     categories: typing.Dict[str, RadarStat]
     challenges: typing.Dict[str, RadarStat]
+    stats: typing.Dict[str, int]
 
 
 class GuildInfo(BaseModel):
