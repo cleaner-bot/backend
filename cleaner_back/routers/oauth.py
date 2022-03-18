@@ -50,19 +50,19 @@ async def oauth_redirect(
     if flow is not None:
         if len(flow) != 64 or not all(x in "0123456789abcdef" for x in flow):
             raise HTTPException(400, "Invalid flow")
-        redirect_target = f"{home}/challenge?flow={flow}"
+        redirect_target = f"/challenge?flow={flow}"
     elif guild is None:
-        redirect_target = f"{home}/dash"
+        redirect_target = f"/dash"
     elif component is None:
         if not guild.isdigit():
             raise HTTPException(400, "Invalid guild id")
-        redirect_target = f"{home}/dash/{guild}"
+        redirect_target = f"/dash/{guild}"
     else:
         if not guild.isdigit():
             raise HTTPException(400, "Invalid guild id")
         if component not in allowed_components:
             raise HTTPException(400, "Invalid component")
-        redirect_target = f"{home}/dash/{guild}/{component}"
+        redirect_target = f"/dash/{guild}/{component}"
 
     state = os.urandom(64).hex()
     await database.set(f"dash:oauth:state:{state}", redirect_target, ex=600)
