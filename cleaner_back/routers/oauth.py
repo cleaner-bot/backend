@@ -97,7 +97,7 @@ async def oauth_redirect(
         if with_admin:
             permissions |= Permissions.ADMINISTRATOR
 
-        query["scope"] += " bot"
+        query["scope"] += " bot applications.commands"
         query["permissions"] = str(int(permissions))
         if guild:
             query["guild_id"] = guild
