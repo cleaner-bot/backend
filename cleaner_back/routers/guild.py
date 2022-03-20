@@ -113,7 +113,7 @@ async def patch_guild_config(
         await database.hset(f"guild:{guild_id}:config", key, msgpack.packb(value))
 
     payload = {"guild_id": int(guild_id), "config": as_dict}
-    await database.publish("pubsub:config-update", msgpack.packb(payload))
+    await database.publish("pubsub:settings-update", msgpack.packb(payload))
 
 
 @router.patch("/guild/{guild_id}/entitlement", status_code=204)
