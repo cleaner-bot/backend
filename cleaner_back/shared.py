@@ -1,5 +1,4 @@
 import asyncio
-import json
 from datetime import datetime
 import os
 
@@ -112,7 +111,7 @@ get_user_lock: dict[str, asyncio.Event] = {}
 async def get_guilds(database: StrictRedis, user_id: str):
     cached = await database.get(f"cache:user:{user_id}:guilds")
     if cached is not None:
-        return json.loads(cached.decode())
+        return msgpack.unpackb(cached.decode())
 
     access_token = await database.get(f"user:{user_id}:oauth:token")
     if access_token is None:
@@ -123,7 +122,7 @@ async def get_guilds(database: StrictRedis, user_id: str):
         await get_guilds_lock[user_id].wait()
         cached = await database.get(f"cache:user:{user_id}:guilds")
         if cached is not None:
-            return json.loads(cached.decode())
+            return msgpack.unpackb(cached.decode())
 
     get_guilds_lock[user_id] = asyncio.Event()
     try:
@@ -153,7 +152,7 @@ async def get_guilds(database: StrictRedis, user_id: str):
         if guild.my_permissions & required_permissions
     ]
 
-    await database.set(f"cache:user:{user_id}:guilds", json.dumps(guildobj), ex=30)
+    await database.set(f"cache:user:{user_id}:guilds", msgpack.packb(guildobj), ex=30)
 
     return guildobj
 
@@ -161,7 +160,7 @@ async def get_guilds(database: StrictRedis, user_id: str):
 async def get_userme(database: StrictRedis, user_id: str):
     cached = await database.get(f"cache:user:{user_id}")
     if cached is not None:
-        return json.loads(cached.decode())
+        return msgpack.unpackb(cached.decode())
 
     access_token = await database.get(f"user:{user_id}:oauth:token")
     if access_token is None:
@@ -172,7 +171,7 @@ async def get_userme(database: StrictRedis, user_id: str):
         await get_user_lock[user_id].wait()
         cached = await database.get(f"cache:user:{user_id}")
         if cached is not None:
-            return json.loads(cached.decode())
+            return msgpack.unpackb(cached.decode())
 
     get_user_lock[user_id] = asyncio.Event()
     try:
@@ -194,7 +193,7 @@ async def get_userme(database: StrictRedis, user_id: str):
         if user.avatar_hash is not None
         else None,
     }
-    await database.set(f"cache:user:{user_id}", json.dumps(userobj), ex=30)
+    await database.set(f"cache:user:{user_id}", msgpack.packb(userobj), ex=30)
 
     return userobj
 

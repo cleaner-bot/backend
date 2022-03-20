@@ -1,7 +1,6 @@
-import json
-
 from coredis import StrictRedis  # type: ignore
 from fastapi import APIRouter, Depends, HTTPException
+import msgpack  # type: ignore
 
 from ..models import RadarInfo
 from ..shared import with_database
@@ -15,4 +14,4 @@ async def get_radar(database: StrictRedis = Depends(with_database)):
     data = await database.get("radar")
     if data is None:
         raise HTTPException(500, "No data available currently.")
-    return json.loads(data)
+    return msgpack.unpackb(data)
