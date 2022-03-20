@@ -1,5 +1,7 @@
 from pydantic import BaseModel
 
+from cleaner_conf.guild import GuildConfig, GuildEntitlements
+
 
 class RadarStat(BaseModel):
     previous: int
@@ -64,8 +66,8 @@ class GIUser(BaseModel):
 
 class DetailedGuildInfo(BaseModel):
     guild: GIGuild | None
-    entitlements: dict[str, int | bool] | None
-    config: dict[str, str] | None
+    entitlements: GuildEntitlements | None
+    config: GuildConfig | None
     user: GIUser
 
 

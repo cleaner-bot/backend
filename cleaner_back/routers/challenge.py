@@ -46,11 +46,9 @@ async def get_challenge(
     if await has_entitlement(
         database, guild_id.decode(), "challenge_interactive_custom_webpage"
     ):
-        splash = await database.get(
-            f"guild:{guild_id}:config:challenge_interactive_webpage_splash"
+        splash = await get_config(
+            database, guild_id.decode(), "challenge_interactive_webpage_splash"
         )
-        if splash is not None:
-            splash = splash.decode()
 
     return {
         "correct_account": user_id.decode() == auth_user_id,

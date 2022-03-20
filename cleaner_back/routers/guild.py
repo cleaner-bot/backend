@@ -1,11 +1,11 @@
-import json
+import typing
 
 from coredis import StrictRedis  # type: ignore
 from fastapi import APIRouter, Depends, HTTPException
+import msgpack  # type: ignore
 
-from cleaner_conf import ValidationError
-from cleaner_conf.guild.config import config
-from cleaner_conf.guild.entitlements import entitlements
+from cleaner_conf.guild import GuildConfig, GuildEntitlements
+
 from ..access import has_access, Access
 from ..shared import (
     with_auth,
@@ -41,6 +41,11 @@ async def check_guild(user_id: str, guild_id: str, database: StrictRedis):
     raise HTTPException(404, "Guild not found")
 
 
+async def fetch_dict(database: StrictRedis, key: str, keys: typing.Sequence[str]):
+    values = await database.hmget(key, *keys)
+    return {k: msgpack.unpackb(v) for k, v in zip(keys, values) if v is not None}
+
+
 @router.get("/guild/{guild_id}", response_model=DetailedGuildInfo)
 async def get_guild(
     guild_id: str,
@@ -64,25 +69,17 @@ async def get_guild(
     if guild is None:
         return {"user": user}
 
-    guild_entitlements = {
-        k: v.decode()
-        if (v := await database.get(f"guild:{guild_id}:entitlement:{k}")) is not None
-        else value.to_string(value.default)
-        for k, value in entitlements.items()
-        if not value.hidden
-    }
-    guild_config = {
-        k: v.decode()
-        if (v := await database.get(f"guild:{guild_id}:config:{k}")) is not None
-        else value.to_string(value.default)
-        for k, value in config.items()
-        if not value.hidden
-    }
+    guild_entitlements = await fetch_dict(
+        database, "entitlements", tuple(GuildEntitlements.__fields__)
+    )
+    guild_config = await fetch_dict(database, "config", tuple(GuildConfig.__fields__))
+
+    print(guild_entitlements, guild_config)
 
     data = {}
     for x in ("roles", "channels", "myself"):
         loaded = await database.get(f"guild:{guild_id}:sync:{x}")
-        data[x] = None if loaded is None else json.loads(loaded)
+        data[x] = None if loaded is None else msgpack.unpackb(loaded)
 
     return {
         "guild": {
@@ -90,8 +87,8 @@ async def get_guild(
             "id": guild["id"],
             "name": guild["name"],
         },
-        "entitlements": guild_entitlements,
-        "config": guild_config,
+        "entitlements": GuildEntitlements(**guild_entitlements),
+        "config": GuildConfig(**guild_config),
         "user": user,
     }
 
@@ -111,19 +108,14 @@ async def patch_guild_config(
         elif not await database.exists(f"guild:{guild_id}:sync:added"):
             raise HTTPException(404, "Guild not found")
 
-    for key, value in changes.items():
-        if key not in config:
-            raise HTTPException(400, f"key not found: {key}")
-        try:
-            config[key].validate_string(value)
-        except ValidationError as e:
-            raise HTTPException(400, f"invalid value for {key}: {e.args[0]}")
+    config = GuildConfig(**changes)
+    as_dict = config.dict(exclude_unset=True)
 
-    for key, value in changes.items():
-        await database.set(f"guild:{guild_id}:config:{key}", value)
+    for key, value in as_dict.items():
+        await database.hset(f"guild:{guild_id}:config", key, msgpack.packb(value))
 
-    payload = {"guild_id": int(guild_id), "table": "config", "changes": changes}
-    await database.publish("pubsub:config-update", json.dumps(payload))
+    payload = {"guild_id": int(guild_id), "config": as_dict}
+    await database.publish("pubsub:config-update", msgpack.packb(payload))
 
 
 @router.patch("/guild/{guild_id}/entitlement", status_code=204)
@@ -138,19 +130,14 @@ async def patch_guild_entitlement(
     if not has_access(user_id, Access.DEVELOPER):
         raise HTTPException(403, "No access")
 
-    for key, value in changes.items():
-        if key not in entitlements:
-            raise HTTPException(400, f"key not found: {key}")
-        try:
-            entitlements[key].validate_string(value)
-        except ValidationError as e:
-            raise HTTPException(400, f"invalid value for {key}: {e.args[0]}")
+    entitlememts = GuildEntitlements(**changes)
+    as_dict = entitlememts.dict(exclude_unset=True)
 
-    for key, value in changes.items():
-        await database.set(f"guild:{guild_id}:entitlement:{key}", value)
+    for key, value in as_dict.items():
+        await database.hset(f"guild:{guild_id}:entitlememts", key, msgpack.packb(value))
 
-    payload = {"guild_id": int(guild_id), "table": "entitlements", "changes": changes}
-    await database.publish("pubsub:config-update", json.dumps(payload))
+    payload = {"guild_id": int(guild_id), "entitlememts": as_dict}
+    await database.publish("pubsub:settings-update", msgpack.packb(payload))
 
 
 @router.post("/guild/{guild_id}/challenge-embed", status_code=204)
@@ -167,10 +154,9 @@ async def post_guild_challenge_embed(
         raise HTTPException(403, "Guild is suspended")
     elif not await database.exists(f"guild:{guild_id}:sync:added"):
         raise HTTPException(404, "Guild not found")
-
     await database.publish(
         "pubsub:challenge-send",
-        json.dumps({"guild": int(guild_id), "channel": request.channel_id}),
+        msgpack.packb({"guild": int(guild_id), "channel": request.channel_id}),
     )
 
 

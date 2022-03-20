@@ -10,7 +10,7 @@ from hikari.urls import BASE_URL
 from hikari.impl import RESTClientImpl
 from jose import jws  # type: ignore
 
-from ..shared import with_database, with_hikari, hikari_rest, home, limiter
+from ..shared import with_database, with_hikari, hikari_rest, limiter
 
 
 router = APIRouter()
@@ -52,7 +52,7 @@ async def oauth_redirect(
             raise HTTPException(400, "Invalid flow")
         redirect_target = f"/challenge?flow={flow}"
     elif guild is None:
-        redirect_target = f"/dash"
+        redirect_target = "/dash"
     elif component is None:
         if not guild.isdigit():
             raise HTTPException(400, "Invalid guild id")

@@ -8,9 +8,9 @@ from fastapi import Depends, HTTPException, Header
 from hikari import RESTApp, Permissions, UnauthorizedError
 from httpx import AsyncClient
 from jose import jws  # type: ignore
+import msgpack  # type: ignore
 
-from cleaner_conf.guild.config import config
-from cleaner_conf.guild.entitlements import entitlements
+from cleaner_conf.guild import GuildConfig, GuildEntitlements
 from cleaner_ratelimit import Limiter, get_visitor_ip
 from cleaner_ratelimit.jail import Jail, CloudflareIPAccessRuleReporter
 
@@ -71,37 +71,38 @@ async def with_optional_auth(
 async def has_entitlement(
     database: StrictRedis, guild_id: str, entitlement: str
 ) -> bool:
-    value = await database.get(f"guild:{guild_id}:entitlement:{entitlement}")
+    value = await database.hget(f"guild:{guild_id}:entitlements", entitlement)
     if value is None:
-        value = entitlements[entitlement].default
+        value = GuildEntitlements.__fields__[entitlement].default
     else:
-        value = int(value)
+        value = msgpack.unpackb(value)
 
     if value == 0:
         return True
 
-    plan = await database.get(f"guild:{guild_id}:entitlement:plan")
+    plan = await database.hget(f"guild:{guild_id}:entitlements", "plan")
     if plan is None:
         return False
 
-    return int(plan) >= value
+    return msgpack.unpackb(plan) >= value
 
 
 async def is_suspended(database: StrictRedis, guild_id: str) -> bool:
-    value = await database.get(f"guild:{guild_id}:entitlement:suspended")
-    if value is None:
-        value = entitlements["suspended"].default
-    else:
-        value = int(value)
+    return await get_entitlement(database, guild_id, "suspended")
 
-    return bool(value)
+
+async def get_entitlement(database: StrictRedis, guild_id: str, name: str) -> bool:
+    value = await database.hget(f"guild:{guild_id}:entitlements", name)
+    if value is None:
+        return GuildEntitlements.__fields__[name].default
+    return GuildEntitlements(suspended=msgpack.unpackb(value)).suspended
 
 
 async def get_config(database: StrictRedis, guild_id: str, name: str):
-    value = await database.get(f"guild:{guild_id}:config:{name}")
+    value = await database.hget(f"guild:{guild_id}:config", name)
     if value is None:
-        return config[name].default
-    return config[name].from_string(value.decode())
+        return GuildConfig.__fields__[name].default
+    return getattr(GuildConfig(**{name: msgpack.unpackb(value)}), name)
 
 
 get_guilds_lock: dict[str, asyncio.Event] = {}
