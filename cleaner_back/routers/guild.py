@@ -128,13 +128,13 @@ async def patch_guild_entitlement(
     if not has_access(user_id, Access.DEVELOPER):
         raise HTTPException(403, "No access")
 
-    entitlememts = GuildEntitlements(**changes)
-    as_dict = entitlememts.dict(exclude_unset=True)
+    entitlements = GuildEntitlements(**changes)
+    as_dict = entitlements.dict(exclude_unset=True)
 
     for key, value in as_dict.items():
-        await database.hset(f"guild:{guild_id}:entitlememts", key, msgpack.packb(value))
+        await database.hset(f"guild:{guild_id}:entitlements", key, msgpack.packb(value))
 
-    payload = {"guild_id": int(guild_id), "entitlememts": as_dict}
+    payload = {"guild_id": int(guild_id), "entitlements": as_dict}
     await database.publish("pubsub:settings-update", msgpack.packb(payload))
 
 
