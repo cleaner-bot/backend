@@ -111,7 +111,7 @@ get_user_lock: dict[str, asyncio.Event] = {}
 async def get_guilds(database: StrictRedis, user_id: str):
     cached = await database.get(f"cache:user:{user_id}:guilds")
     if cached is not None:
-        return msgpack.unpackb(cached.decode())
+        return msgpack.unpackb(cached)
 
     access_token = await database.get(f"user:{user_id}:oauth:token")
     if access_token is None:
@@ -122,7 +122,7 @@ async def get_guilds(database: StrictRedis, user_id: str):
         await get_guilds_lock[user_id].wait()
         cached = await database.get(f"cache:user:{user_id}:guilds")
         if cached is not None:
-            return msgpack.unpackb(cached.decode())
+            return msgpack.unpackb(cached)
 
     get_guilds_lock[user_id] = asyncio.Event()
     try:
@@ -160,7 +160,7 @@ async def get_guilds(database: StrictRedis, user_id: str):
 async def get_userme(database: StrictRedis, user_id: str):
     cached = await database.get(f"cache:user:{user_id}")
     if cached is not None:
-        return msgpack.unpackb(cached.decode())
+        return msgpack.unpackb(cached)
 
     access_token = await database.get(f"user:{user_id}:oauth:token")
     if access_token is None:
@@ -171,7 +171,7 @@ async def get_userme(database: StrictRedis, user_id: str):
         await get_user_lock[user_id].wait()
         cached = await database.get(f"cache:user:{user_id}")
         if cached is not None:
-            return msgpack.unpackb(cached.decode())
+            return msgpack.unpackb(cached)
 
     get_user_lock[user_id] = asyncio.Event()
     try:

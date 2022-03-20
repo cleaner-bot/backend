@@ -70,11 +70,9 @@ async def get_guild(
         return {"user": user}
 
     guild_entitlements = await fetch_dict(
-        database, "entitlements", tuple(GuildEntitlements.__fields__)
+        database, f"guild:{guild_id}:entitlements", tuple(GuildEntitlements.__fields__)
     )
-    guild_config = await fetch_dict(database, "config", tuple(GuildConfig.__fields__))
-
-    print(guild_entitlements, guild_config)
+    guild_config = await fetch_dict(database, f"guild:{guild_id}:config", tuple(GuildConfig.__fields__))
 
     data = {}
     for x in ("roles", "channels", "myself"):
@@ -96,7 +94,7 @@ async def get_guild(
 @router.patch("/guild/{guild_id}/config", status_code=204)
 async def patch_guild_config(
     guild_id: str,
-    changes: dict[str, str],
+    changes: dict[str, typing.Any],
     user_id: str = Depends(with_auth),
     database: StrictRedis = Depends(with_database),
 ):
@@ -121,7 +119,7 @@ async def patch_guild_config(
 @router.patch("/guild/{guild_id}/entitlement", status_code=204)
 async def patch_guild_entitlement(
     guild_id: str,
-    changes: dict[str, str],
+    changes: dict[str, typing.Any],
     user_id: str = Depends(with_auth),
     database: StrictRedis = Depends(with_database),
 ):
