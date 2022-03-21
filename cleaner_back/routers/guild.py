@@ -79,14 +79,15 @@ async def get_guild(
         database, f"guild:{guild_id}:config", tuple(GuildConfig.__fields__)
     )
 
-    data = {}
-    for x in ("roles", "channels", "myself"):
-        loaded = await database.get(f"guild:{guild_id}:sync:{x}")
-        data[x] = None if loaded is None else msgpack.unpackb(loaded)
+    myself, roles, channels = await database.hmget(
+        f"guild:{guild_id}:sync", ("myself", "roles", "channels")
+    )
 
     return {
         "guild": {
-            **data,
+            "myself": None if myself is None else msgpack.unpackb(myself),
+            "roles": None if roles is None else msgpack.unpackb(roles),
+            "channels": None if channels is None else msgpack.unpackb(channels),
             "id": guild["id"],
             "name": guild["name"],
         },
