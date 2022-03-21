@@ -1,7 +1,9 @@
+from datetime import datetime, timedelta
 import os
 
 from coredis import StrictRedis
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
+from jose import jws  # type: ignore
 
 from .guild import get_guilds
 from ..shared import with_auth, with_database, limiter, is_suspended
@@ -58,12 +60,11 @@ async def user_me_guilds(
 @router.post("/user/@me/remote-auth")
 @limiter.limit("5/1h")
 async def user_me_remote_auth(
-    x_token: str = Header(None),
     user_id: str = Depends(with_auth),
     database: StrictRedis = Depends(with_database),
 ):
     code = os.urandom(32).hex()
-    await database.set(f"remote-auth:{code}", x_token, ex=300)
+    await database.set(f"remote-auth:{code}", user_id, ex=300)
     return code
 
 
@@ -74,9 +75,23 @@ async def remote_auth(auth: RemoteAuth, database: StrictRedis = Depends(with_dat
     if len(code) != 64 or not all(x in "0123456789abcdef" for x in code):
         raise HTTPException(400, "Bad code")
 
-    token = await database.get(f"remote-auth:{code}")
-    if token is None:
+    user_id = await database.get(f"remote-auth:{code}")
+    if user_id is None:
         raise HTTPException(404, "Code not found or expired")
     await database.delete(f"remote-auth:{code}")
 
-    return token
+    expires_after = 60 * 60 * 24 * 7
+    expires = datetime.utcnow() + timedelta(seconds=expires_after)
+    session = os.urandom(32)
+
+    data = f"{int(expires.timestamp())}.{session.hex()}.{user_id.decode()}"
+    await database.set(
+        f"user:{user_id.decode()}:dash:session:{session.hex()}", 1, ex=expires_after
+    )
+
+    secret = os.getenv("SECRET_WEB_AUTH")
+    token = jws.sign(data.encode(), secret, algorithm="HS256")
+
+    return {
+        "token": token
+    }
