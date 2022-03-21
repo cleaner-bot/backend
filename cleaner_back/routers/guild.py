@@ -45,7 +45,7 @@ async def check_guild(user_id: str, guild_id: str, database: StrictRedis):
 
 
 async def fetch_dict(database: StrictRedis, key: str, keys: typing.Sequence[str]):
-    values = await database.hmget(key, *keys)
+    values = await database.hmget(key, keys)
     return {k: msgpack.unpackb(v) for k, v in zip(keys, values) if v is not None}
 
 
