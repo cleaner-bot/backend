@@ -51,7 +51,7 @@ async def with_auth(
     if datetime.utcfromtimestamp(int(expires)) < datetime.utcnow():
         raise HTTPException(401, "Session expired")
 
-    session_exists = await database.exists(f"user:{userid}:dash:session:{session}")
+    session_exists = await database.exists((f"user:{userid}:dash:session:{session}",))
     if not session_exists:
         raise HTTPException(401, "Session revoked")
 

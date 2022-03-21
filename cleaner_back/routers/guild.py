@@ -2,6 +2,7 @@ import typing
 
 from coredis import StrictRedis
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import ValidationError
 import msgpack  # type: ignore
 
 from cleaner_conf.guild import GuildConfig, GuildEntitlements
@@ -28,7 +29,9 @@ async def check_guild(user_id: str, guild_id: str, database: StrictRedis):
         if guild["id"] == guild_id:
             return guild
 
-    if has_access(user_id) and await database.exists(f"guild:{guild_id}:sync:added"):
+    if has_access(user_id) and await database.hexists(
+        f"guild:{guild_id}:sync", "added"
+    ):
         return {
             "id": guild_id,
             "name": "Placeholder",
@@ -61,8 +64,8 @@ async def get_guild(
     if has_access(user_id):
         user["is_dev"] = True
 
-    if not await database.exists(
-        f"guild:{guild_id}:sync:added"
+    if not await database.hexists(
+        f"guild:{guild_id}:sync", "added"
     ) and not await is_suspended(database, guild_id):
         guild = None
 
@@ -105,10 +108,14 @@ async def patch_guild_config(
     if not has_access(user_id):
         if await is_suspended(database, guild_id):
             raise HTTPException(403, "Guild is suspended")
-        elif not await database.exists(f"guild:{guild_id}:sync:added"):
+        elif not await database.hexists(f"guild:{guild_id}:sync", "added"):
             raise HTTPException(404, "Guild not found")
 
-    config = GuildConfig(**changes)
+    try:
+        config = GuildConfig(**changes)
+    except ValidationError as e:
+        raise HTTPException(422, e.errors())
+
     as_dict = config.dict(exclude_unset=True)
 
     await database.hset(
@@ -132,7 +139,11 @@ async def patch_guild_entitlement(
     if not has_access(user_id, Access.DEVELOPER):
         raise HTTPException(403, "No access")
 
-    entitlements = GuildEntitlements(**changes)
+    try:
+        entitlements = GuildEntitlements(**changes)
+    except ValidationError as e:
+        raise HTTPException(422, e.errors())
+
     as_dict = entitlements.dict(exclude_unset=True)
 
     await database.hset(
@@ -156,7 +167,7 @@ async def post_guild_challenge_embed(
 
     if await is_suspended(database, guild_id):
         raise HTTPException(403, "Guild is suspended")
-    elif not await database.exists(f"guild:{guild_id}:sync:added"):
+    elif not await database.hexists(f"guild:{guild_id}:sync", "added"):
         raise HTTPException(404, "Guild not found")
     await database.publish(
         "pubsub:challenge-send",
@@ -174,7 +185,7 @@ async def get_guild_logging_downloads(
 
     if await is_suspended(database, guild_id):
         raise HTTPException(403, "Guild is suspended")
-    elif not await database.exists(f"guild:{guild_id}:sync:added"):
+    elif not await database.hexists(f"guild:{guild_id}:sync", "added"):
         raise HTTPException(404, "Guild not found")
     elif not await has_entitlement(database, guild_id, "logging_downloads"):
         raise HTTPException(

@@ -50,7 +50,7 @@ async def user_me_guilds(
     guilds = await get_guilds(database, user_id)
     for guild in guilds:
         guild_id = guild["id"]
-        guild["is_added"] = await database.exists(f"guild:{guild_id}:sync:added")
+        guild["is_added"] = await database.hexists(f"guild:{guild_id}:sync", "added")
         guild["is_suspended"] = await is_suspended(database, guild_id)
     return guilds
 

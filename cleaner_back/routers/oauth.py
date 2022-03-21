@@ -9,6 +9,7 @@ from hikari import BadRequestError, UnauthorizedError, Permissions
 from hikari.urls import BASE_URL
 from hikari.impl import RESTClientImpl
 from jose import jws  # type: ignore
+import msgpack  # type: ignore
 
 from ..shared import with_database, with_hikari, hikari_rest, limiter
 
@@ -50,22 +51,19 @@ async def oauth_redirect(
     if flow is not None:
         if len(flow) != 64 or not all(x in "0123456789abcdef" for x in flow):
             raise HTTPException(400, "Invalid flow")
-        redirect_target = f"/challenge?flow={flow}"
+        state = f"0{flow}"
     elif guild is None:
-        redirect_target = "/dash"
+        state = "1"
     elif component is None:
         if not guild.isdigit():
             raise HTTPException(400, "Invalid guild id")
-        redirect_target = f"/dash/{guild}"
+        state = f"2{guild}"
     else:
         if not guild.isdigit():
             raise HTTPException(400, "Invalid guild id")
         if component not in allowed_components:
             raise HTTPException(400, "Invalid component")
-        redirect_target = f"/dash/{guild}/{component}"
-
-    state = os.urandom(64).hex()
-    await database.set(f"dash:oauth:state:{state}", redirect_target, ex=600)
+        state = f"3{guild}.{allowed_components.index(component)}"
 
     client_id = os.getenv("SECRET_CLIENT_ID")
     if client_id is None:
@@ -114,15 +112,25 @@ async def oauth_callback(
     database: StrictRedis = Depends(with_database),
     hikari: RESTClientImpl = Depends(with_hikari),
 ):
-    if state is None:
-        raise HTTPException(400, "Missing state param")
-
-    if len(state) != 128 or not all(x in "0123456789abcdef" for x in state):
+    if state is None or state[0] == "1":
+        redirect_target = "/dash"
+    elif state[0] == "0":
+        if len(state) != 65 or not all(x in "0123456789abcdef" for x in state):
+            raise HTTPException(400, "Invalid state")
+        flow = state[1:]
+        redirect_target = f"/challenge?flow={flow}"
+    elif state[0] == "2":
+        guild_id = state[1:]
+        if not guild_id.isdigit():
+            raise HTTPException(400, "Invalid state")
+        redirect_target = f"/dash/{guild_id}"
+    elif state[0] == "3":
+        guild_id, component = state[1:].split("-")
+        if not guild_id.isdigit() or not component.isdigit():
+            raise HTTPException(400, "Invalid state")
+        redirect_target = f"/dash/{guild_id}/{allowed_components[int(component)]}"
+    else:
         raise HTTPException(400, "Invalid state")
-
-    redirect_target = await database.get(f"dash:oauth:state:{state}")
-    if redirect_target is None:
-        raise HTTPException(404, "State not found")
 
     if code is None:
         return {"redirect": redirect_target}
@@ -164,14 +172,16 @@ async def oauth_callback(
         f"user:{auth.user.id}:dash:session:{session.hex()}", 1, ex=expires_after
     )
 
-    # userobj = {
-    #     "id": auth.user.id,
-    #     "name": auth.user.username,
-    #     "avatar": auth.user.make_avatar_url(ext="jpg", size=64).url,
-    # }
-    # await database.set(f"cache:user:@me:{auth.user.id}", json.dumps(userobj), ex=30)
+    userobj = {
+        "id": auth.user.id,
+        "name": auth.user.username,
+        "avatar": auth.user.make_avatar_url(ext="webp", size=64).url  # type: ignore
+        if auth.user.avatar_hash is not None
+        else None,
+    }
+    await database.set(f"cache:user:{auth.user.id}", msgpack.packb(userobj), ex=30)
 
     secret = os.getenv("SECRET_WEB_AUTH")
     token = jws.sign(data.encode(), secret, algorithm="HS256")
 
-    return {"token": token, "redirect": redirect_target.decode()}
+    return {"token": token, "redirect": redirect_target}
