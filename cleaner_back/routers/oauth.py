@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 import os
 from urllib.parse import urlencode
 
-from coredis import StrictRedis  # type: ignore
+from coredis import StrictRedis
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import RedirectResponse
 from hikari import BadRequestError, UnauthorizedError, Permissions

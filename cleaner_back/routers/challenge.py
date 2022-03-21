@@ -1,6 +1,6 @@
 import os
 
-from coredis import StrictRedis  # type: ignore
+from coredis import StrictRedis
 from fastapi import APIRouter, Depends, HTTPException
 
 
@@ -27,10 +27,9 @@ async def get_challenge(
     if len(flow) != 64 or not all(x in "0123456789abcdef" for x in flow):
         raise HTTPException(400, "Invalid flow")
     user_id = await database.get(f"challenge:flow:{flow}:user")
-    if user_id is None:
-        raise HTTPException(404, "Flow not found")
-
     guild_id = await database.get(f"challenge:flow:{flow}:guild")
+    if user_id is None or guild_id is None:
+        raise HTTPException(404, "Flow not found")
 
     if not await database.exists(f"guild:{guild_id}:sync:added"):
         raise HTTPException(404, "Guild not found")

@@ -1,6 +1,6 @@
 import typing
 
-from coredis import StrictRedis  # type: ignore
+from coredis import StrictRedis
 from fastapi import APIRouter, Depends, HTTPException
 import msgpack  # type: ignore
 
@@ -111,8 +111,10 @@ async def patch_guild_config(
     config = GuildConfig(**changes)
     as_dict = config.dict(exclude_unset=True)
 
-    for key, value in as_dict.items():
-        await database.hset(f"guild:{guild_id}:config", key, msgpack.packb(value))
+    await database.hset(
+        f"guild:{guild_id}:config",
+        {key: msgpack.packb(value) for key, value in as_dict.items()},
+    )
 
     payload = {"guild_id": int(guild_id), "config": as_dict}
     await database.publish("pubsub:settings-update", msgpack.packb(payload))
@@ -133,8 +135,10 @@ async def patch_guild_entitlement(
     entitlements = GuildEntitlements(**changes)
     as_dict = entitlements.dict(exclude_unset=True)
 
-    for key, value in as_dict.items():
-        await database.hset(f"guild:{guild_id}:entitlements", key, msgpack.packb(value))
+    await database.hset(
+        f"guild:{guild_id}:entitlements",
+        {key: msgpack.packb(value) for key, value in as_dict.items()},
+    )
 
     payload = {"guild_id": int(guild_id), "entitlements": as_dict}
     await database.publish("pubsub:settings-update", msgpack.packb(payload))

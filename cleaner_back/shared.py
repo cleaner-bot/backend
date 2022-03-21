@@ -2,7 +2,7 @@ import asyncio
 from datetime import datetime
 import os
 
-from coredis import StrictRedis  # type: ignore
+from coredis import StrictRedis
 from fastapi import Depends, HTTPException, Header
 from hikari import RESTApp, Permissions, UnauthorizedError
 from httpx import AsyncClient

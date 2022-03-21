@@ -1,4 +1,4 @@
-from coredis import StrictRedis  # type: ignore
+from coredis import StrictRedis
 from fastapi import APIRouter, Depends, HTTPException
 import msgpack  # type: ignore
 

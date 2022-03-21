@@ -1,6 +1,6 @@
 import os
 
-from coredis import StrictRedis  # type: ignore
+from coredis import StrictRedis
 from fastapi import APIRouter, Depends, Header, HTTPException
 
 from .guild import get_guilds
