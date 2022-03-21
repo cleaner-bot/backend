@@ -72,7 +72,9 @@ async def get_guild(
     guild_entitlements = await fetch_dict(
         database, f"guild:{guild_id}:entitlements", tuple(GuildEntitlements.__fields__)
     )
-    guild_config = await fetch_dict(database, f"guild:{guild_id}:config", tuple(GuildConfig.__fields__))
+    guild_config = await fetch_dict(
+        database, f"guild:{guild_id}:config", tuple(GuildConfig.__fields__)
+    )
 
     data = {}
     for x in ("roles", "channels", "myself"):
