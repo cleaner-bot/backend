@@ -184,4 +184,8 @@ async def oauth_callback(
     secret = os.getenv("SECRET_WEB_AUTH")
     token = jws.sign(data.encode(), secret, algorithm="HS256")
 
+    if redirect_target == "/dash" and authtoken.guild is not None:
+        redirect_target = f"/dash/{authtoken.guild.id}"
+        await database.hset(f"guild:{authtoken.guild.id}:sync", {"added": 1})
+
     return {"token": token, "redirect": redirect_target}
