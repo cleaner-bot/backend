@@ -6,6 +6,7 @@ from cleaner_ratelimit import RatelimitMiddleware
 
 from .routers import challenge, guild, oauth, radar, user
 from .shared import limiter
+from .middleware import DBConnectErrorMiddleware
 
 
 app = FastAPI()
@@ -25,6 +26,7 @@ app.add_middleware(
     allow_headers=["*"],
     expose_headers=["*"],
 )
+app.add_middleware(DBConnectErrorMiddleware)
 
 app.include_router(challenge.router)
 app.include_router(guild.router)
