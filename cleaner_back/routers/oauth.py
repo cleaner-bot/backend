@@ -175,9 +175,8 @@ async def oauth_callback(
     userobj = {
         "id": auth.user.id,
         "name": auth.user.username,
-        "avatar": auth.user.make_avatar_url(ext="webp", size=64).url  # type: ignore
-        if auth.user.avatar_hash is not None
-        else None,
+        "discriminator": auth.user.discriminator,
+        "avatar": auth.user.avatar_hash,
     }
     await database.set(f"cache:user:{auth.user.id}", msgpack.packb(userobj), ex=30)
 

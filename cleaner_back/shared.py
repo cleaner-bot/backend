@@ -142,9 +142,7 @@ async def get_guilds(database: StrictRedis, user_id: str):
         {
             "id": str(guild.id),
             "name": guild.name,
-            "icon": guild.make_icon_url(ext="webp", size=64).url  # type: ignore
-            if guild.icon_hash
-            else None,
+            "icon": guild.icon_hash,
             "is_owner": guild.is_owner,
             "is_admin": guild.my_permissions & Permissions.ADMINISTRATOR > 0,
         }
@@ -189,9 +187,8 @@ async def get_userme(database: StrictRedis, user_id: str):
     userobj = {
         "id": user.id,
         "name": user.username,
-        "avatar": user.make_avatar_url(ext="webp", size=64).url  # type: ignore
-        if user.avatar_hash is not None
-        else None,
+        "discriminator": user.discriminator,
+        "avatar": user.avatar_hash,
     }
     await database.set(f"cache:user:{user_id}", msgpack.packb(userobj), ex=30)
 
