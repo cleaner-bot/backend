@@ -8,10 +8,6 @@ from starlette.requests import Request
 
 
 class DBConnectErrorMiddleware(BaseHTTPMiddleware):
-    def __init__(self, app, dispatch=None) -> None:
-        super().__init__(app, dispatch)
-        self.buckets = {}
-
     async def dispatch(
         self, request: Request, call_next: RequestResponseEndpoint
     ) -> Response:
