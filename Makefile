@@ -9,8 +9,8 @@ coverage:
 	coverage report -m
 
 lint:
-	flake8 . --max-line-length 88 --exclude build
-	mypy . --exclude build
-	codespell . --skip ".*"
+	flake8 .
+	mypy .
+	codespell .
 
 test-all: coverage lint
