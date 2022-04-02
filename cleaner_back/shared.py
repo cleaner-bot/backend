@@ -130,7 +130,7 @@ async def get_guilds(database: StrictRedis, user_id: str):
             guilds = await selfbot.fetch_my_guilds()
 
     except UnauthorizedError:
-        await database.delete(f"user:{user_id}:oauth:token")
+        await database.delete((f"user:{user_id}:oauth:token",))
         raise HTTPException(401, "Session expired")
 
     finally:
@@ -177,7 +177,7 @@ async def get_userme(database: StrictRedis, user_id: str):
             user = await selfbot.fetch_my_user()
 
     except UnauthorizedError:
-        await database.delete(f"user:{user_id}:oauth:token")
+        await database.delete((f"user:{user_id}:oauth:token",))
         raise HTTPException(401, "Session expired")
 
     finally:

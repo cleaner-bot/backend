@@ -42,7 +42,7 @@ async def user_me_delete_sessions(
     async for session in database.scan_iter(f"user:{user_id}:dash:session:*"):
         sessions.append(session)
     if sessions:
-        await database.delete(*sessions)
+        await database.delete(sessions)
 
 
 @router.get("/user/@me/guilds", response_model=list[GuildInfo])
@@ -78,7 +78,7 @@ async def remote_auth(auth: RemoteAuth, database: StrictRedis = Depends(with_dat
     user_id = await database.get(f"remote-auth:{code}")
     if user_id is None:
         raise HTTPException(404, "Code not found or expired")
-    await database.delete(f"remote-auth:{code}")
+    await database.delete((f"remote-auth:{code}",))
 
     expires_after = 60 * 60 * 24 * 7
     expires = datetime.utcnow() + timedelta(seconds=expires_after)

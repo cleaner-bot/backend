@@ -37,7 +37,7 @@ async def get_challenge(
     elif not await get_config(
         database, guild_id.decode(), "challenge_interactive_enabled"
     ):
-        await database.delete(f"challenge:flow:{flow}:user")
+        await database.delete((f"challenge:flow:{flow}",))
         raise HTTPException(400, "Guild does not have interactive challenges enabled")
 
     splash = None
@@ -76,7 +76,7 @@ async def post_challenge(
     elif not await get_config(
         database, guild_id.decode(), "challenge_interactive_enabled"
     ):
-        await database.delete(f"challenge:flow:{flow}:user")
+        await database.delete((f"challenge:flow:{flow}",))
         raise HTTPException(400, "Guild does not have interactive challenges enabled")
 
     if auth_user_id != user_id.decode():
