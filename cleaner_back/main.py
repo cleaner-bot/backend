@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from cleaner_ratelimit import RatelimitMiddleware
 
-from .routers import challenge, guild, oauth, radar, user
+from .routers import challenge, guild, oauth, radar, user, verification
 from .shared import limiter
 from .middleware import DBConnectErrorMiddleware
 
@@ -33,6 +33,7 @@ app.include_router(guild.router)
 app.include_router(oauth.router)
 app.include_router(radar.router)
 app.include_router(user.router)
+app.include_router(verification.router)
 
 app.state.limiter = limiter
 
