@@ -29,6 +29,7 @@ class GuildInfo(BaseModel):
 class UserInfo(BaseModel):
     id: str
     name: str
+    discriminator: str
     avatar: str | None
 
 
@@ -77,9 +78,14 @@ class DownloadInfo(BaseModel):
     expired: bool
 
 
-class Challenge(BaseModel):
-    flow: str
-    captcha: str | None
+class ChallengerResponse(BaseModel):
+    user: UserInfo
+    is_valid: bool
+    captcha_required: bool
+
+
+class ChallengerRequest(BaseModel):
+    token: str | None
 
 
 class ChannelId(BaseModel):
