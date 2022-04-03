@@ -27,24 +27,20 @@ async def get_verification(
 ):
     if not await database.hexists(f"guild:{guild}:sync", "added"):
         raise HTTPException(404, "Guild not found")
-    elif not await get_config(
-        database, guild, "verification_enabled"
-    ):
+    elif not await get_config(database, guild, "verification_enabled"):
         raise HTTPException(400, "Guild does not have verification enabled")
-    
+
     user = await get_userme(database, user_id)
 
     splash = None
-    if await has_entitlement(
-        database, guild, "verification_custom_webpage"
-    ):
-        splash = await get_config(
-            database, guild, "verification_webpage_splash"
-        )
+    if await has_entitlement(database, guild, "verification_custom_webpage"):
+        splash = await get_config(database, guild, "verification_webpage_splash")
 
     return {
         "user": user,
-        "is_valid": await database.exists((f"guild:{guild}:user:{user_id}:verification",)),
+        "is_valid": await database.exists(
+            (f"guild:{guild}:user:{user_id}:verification",)
+        ),
         "captcha_required": True,
         "splash": splash,
     }
@@ -59,9 +55,7 @@ async def post_verification(
 ):
     if not await database.hexists(f"guild:{guild}:sync", "added"):
         raise HTTPException(404, "Guild not found")
-    elif not await get_config(
-        database, guild, "verification_enabled"
-    ):
+    elif not await get_config(database, guild, "verification_enabled"):
         raise HTTPException(400, "Guild does not have verification enabled")
 
     if not await database.exists((f"guild:{guild}:user:{user_id}:verification",)):
@@ -86,6 +80,6 @@ async def post_verification(
             raise HTTPException(400, "Invalid captcha token")
 
     await database.publish(
-        "pubsub:verification-verify", 
+        "pubsub:verification-verify",
         msgpack.packb({"guild": guild, "user": int(user_id)}),
     )

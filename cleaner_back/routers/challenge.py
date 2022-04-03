@@ -88,7 +88,7 @@ async def post_challenge(
     if (body is None or body.token is None) == is_captcha is not None:
         raise HTTPException(400, "Expected or unexpected captcha token")
 
-    if is_captcha is not None:
+    if is_captcha is not None and body is not None:
         hcaptcha_secret = os.getenv("SECRET_HCAPTCHA")
         hcaptcha_sitekey = os.getenv("SECRET_HCAPTCHA_SITEKEY")
         if hcaptcha_secret is None or hcaptcha_sitekey is None:

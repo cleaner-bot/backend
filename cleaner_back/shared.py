@@ -68,7 +68,7 @@ async def with_optional_auth(
 
 
 async def has_entitlement(
-    database: StrictRedis, guild_id: str, entitlement: str
+    database: StrictRedis, guild_id: str | int, entitlement: str
 ) -> bool:
     value = await database.hget(f"guild:{guild_id}:entitlements", entitlement)
     if value is None:
@@ -86,18 +86,20 @@ async def has_entitlement(
     return msgpack.unpackb(plan) >= value
 
 
-async def is_suspended(database: StrictRedis, guild_id: str) -> bool:
+async def is_suspended(database: StrictRedis, guild_id: str | int) -> bool:
     return await get_entitlement(database, guild_id, "suspended")
 
 
-async def get_entitlement(database: StrictRedis, guild_id: str, name: str) -> bool:
+async def get_entitlement(
+    database: StrictRedis, guild_id: str | int, name: str
+) -> bool:
     value = await database.hget(f"guild:{guild_id}:entitlements", name)
     if value is None:
         return GuildEntitlements.__fields__[name].default
     return GuildEntitlements(suspended=msgpack.unpackb(value)).suspended
 
 
-async def get_config(database: StrictRedis, guild_id: str, name: str):
+async def get_config(database: StrictRedis, guild_id: str | int, name: str):
     value = await database.hget(f"guild:{guild_id}:config", name)
     if value is None:
         return GuildConfig.__fields__[name].default
