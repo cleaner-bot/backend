@@ -41,7 +41,7 @@ async def get_verification(
         "is_valid": await database.exists(
             (f"guild:{guild}:user:{user_id}:verification",)
         ),
-        "captcha_required": True,
+        "captcha_required": False,
         "splash": splash,
     }
 
