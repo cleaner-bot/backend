@@ -24,6 +24,7 @@ app.add_middleware(
     allow_origins=origins,
     allow_methods=["*"],
     allow_headers=["*"],
+    allow_credentials=True,
     expose_headers=["*"],
 )
 app.add_middleware(DBConnectErrorMiddleware)
