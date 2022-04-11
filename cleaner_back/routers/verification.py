@@ -64,7 +64,7 @@ async def post_verification(
     is_captcha = body.token is not None  # TODO: captcha logic
     if is_captcha:
         hcaptcha_secret = os.getenv("SECRET_HCAPTCHA")
-        hcaptcha_sitekey = os.getenv("SECRET_HCAPTCHA_SITEKEY")
+        hcaptcha_sitekey = os.getenv("HCAPTCHA_SITEKEY")
         if hcaptcha_secret is None or hcaptcha_sitekey is None:
             raise HTTPException(500, "Configuration issue, please contact support")
         res = await aclient.post(

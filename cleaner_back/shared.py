@@ -204,7 +204,7 @@ reporter = None
 cf_email = os.getenv("SECRET_CF_EMAIL")
 cf_key = os.getenv("SECRET_CF_KEY")
 if cf_email is not None and cf_key is not None:
-    zone = os.getenv("SECRET_CF_ZONE")
+    zone = os.getenv("CF_ZONE")
     reporter = CloudflareIPAccessRuleReporter(
         cf_email,
         cf_key,

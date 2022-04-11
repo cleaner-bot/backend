@@ -90,7 +90,7 @@ async def post_challenge(
 
     if is_captcha is not None and body is not None:
         hcaptcha_secret = os.getenv("SECRET_HCAPTCHA")
-        hcaptcha_sitekey = os.getenv("SECRET_HCAPTCHA_SITEKEY")
+        hcaptcha_sitekey = os.getenv("HCAPTCHA_SITEKEY")
         if hcaptcha_secret is None or hcaptcha_sitekey is None:
             raise HTTPException(500, "Configuration issue, please contact support")
         res = await aclient.post(

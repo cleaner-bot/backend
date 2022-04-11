@@ -72,7 +72,7 @@ async def oauth_redirect(
             raise HTTPException(400, "Invalid component")
         state = f"4{guild}.{allowed_components.index(component)}"
 
-    client_id = os.getenv("SECRET_CLIENT_ID")
+    client_id = os.getenv("CLIENT_ID")
     if client_id is None:
         raise HTTPException(500, "Configuration issue, please contact support")
 
@@ -148,7 +148,7 @@ async def oauth_callback(
         return {"redirect": redirect_target}
 
     client_secret = os.getenv("SECRET_CLIENT")
-    client_id = os.getenv("SECRET_CLIENT_ID")
+    client_id = os.getenv("CLIENT_ID")
     if client_secret is None or client_id is None:
         raise HTTPException(500, "Configuration issue, please contact support")
 
