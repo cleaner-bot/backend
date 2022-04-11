@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from cleaner_ratelimit import RatelimitMiddleware
 
-from .routers import challenge, guild, oauth, radar, user, verification
+from .routers import challenge, downdoom, guild, oauth, radar, user, verification
 from .shared import limiter
 from .middleware import DBConnectErrorMiddleware
 
@@ -30,6 +30,7 @@ app.add_middleware(
 app.add_middleware(DBConnectErrorMiddleware)
 
 app.include_router(challenge.router)
+app.include_router(downdoom.router)
 app.include_router(guild.router)
 app.include_router(oauth.router)
 app.include_router(radar.router)
