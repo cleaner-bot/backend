@@ -29,6 +29,8 @@ async def get_verification(
         raise HTTPException(404, "Guild not found")
     elif not await get_config(database, guild, "verification_enabled"):
         raise HTTPException(400, "Guild does not have verification enabled")
+    elif await get_config(database, guild, "verification_role") == "0":
+        raise HTTPException(400, "Guild does not have a verification role")
 
     user = await get_userme(database, user_id)
 
@@ -57,6 +59,8 @@ async def post_verification(
         raise HTTPException(404, "Guild not found")
     elif not await get_config(database, guild, "verification_enabled"):
         raise HTTPException(400, "Guild does not have verification enabled")
+    elif await get_config(database, guild, "verification_role") == "0":
+        raise HTTPException(400, "Guild does not have a verification role")
 
     if not await database.exists((f"guild:{guild}:user:{user_id}:verification",)):
         raise HTTPException(404, "You are not pending verification.")
