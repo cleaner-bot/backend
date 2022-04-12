@@ -14,7 +14,7 @@ from cleaner_ratelimit import Limiter, get_visitor_ip
 from cleaner_ratelimit.jail import Jail, CloudflareIPAccessRuleReporter
 
 
-home = "https://cleaner-beta.leodev.xyz"
+home = "https://cleaner.leodev.xyz"
 redis = StrictRedis()
 aclient = AsyncClient(headers={"user-agent": "CleanerBot (cleaner.leodev.xyz 0.1.0)"})
 hikari_rest = RESTApp()
