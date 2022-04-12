@@ -15,7 +15,8 @@ from cleaner_ratelimit.jail import Jail, CloudflareIPAccessRuleReporter
 
 
 home = "https://cleaner.leodev.xyz"
-redis = StrictRedis()
+redis_db = os.getenv("REDIS_URL")
+redis = StrictRedis.from_url(redis_db) if redis_db is not None else StrictRedis()
 aclient = AsyncClient(headers={"user-agent": "CleanerBot (cleaner.leodev.xyz 0.1.0)"})
 hikari_rest = RESTApp()
 
