@@ -24,7 +24,7 @@ def generate_upload_url(guild_id: str, category: str):
         raise HTTPException(500, "Configuration issue, please contact support")
 
     asset = guild_id
-    expire = int((datetime.utcnow() + timedelta(seconds=60)).timestamp() * 1000)
+    expire = int(datetime.now().timestamp() * 1000 + 60_000)
 
     data = f"{category}:{asset}:{expire}"
     mac = hmac.new(key.encode(), data.encode(), "sha256").digest()
