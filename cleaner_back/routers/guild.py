@@ -17,7 +17,7 @@ from ..shared import (
     get_guilds,
     get_userme,
 )
-from ..models import DetailedGuildInfo, DownloadInfo, ChannelId
+from ..models import DetailedGuildInfo, DownloadInfo, ChannelId, Analytics
 
 
 router = APIRouter()
@@ -214,3 +214,24 @@ async def get_guild_logging_downloads(
         {"year": 2022, "month": 1, "expired": False},
         {"year": 2022, "month": 2, "expired": False},
     ]
+
+
+@router.get("/guild/{guild_id}/analytics", response_model=Analytics)
+async def get_guild_analytics(
+    guild_id: str,
+    user_id: str = Depends(with_auth),
+    database: StrictRedis = Depends(with_database),
+):
+    await check_guild(user_id, guild_id, database)
+
+    if await is_suspended(database, guild_id):
+        raise HTTPException(403, "Guild is suspended")
+    elif not await database.hexists(f"guild:{guild_id}:sync", "added"):
+        raise HTTPException(404, "Guild not found")
+    elif not await has_entitlement(database, guild_id, "analytics"):
+        raise HTTPException(403, "Guild does not have the 'analytics' entitlement")
+
+    data = await database.get(f"guild:{guild_id}:radar")
+    if data is None:
+        raise HTTPException(500, "No data available currently.")
+    return msgpack.unpackb(data)

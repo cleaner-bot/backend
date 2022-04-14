@@ -3,17 +3,24 @@ from pydantic import BaseModel
 from cleaner_conf.guild import GuildConfig, GuildEntitlements
 
 
-class RadarStat(BaseModel):
+class Stat(BaseModel):
     previous: int
     now: int
 
 
 class RadarInfo(BaseModel):
-    rules: dict[str, RadarStat]
-    traffic: dict[str, RadarStat]
-    categories: dict[str, RadarStat]
-    challenges: dict[str, RadarStat]
+    rules: dict[str, Stat]
+    traffic: dict[str, Stat]
+    categories: dict[str, Stat]
+    challenges: dict[str, Stat]
     stats: dict[str, int]
+
+
+class Analytics(BaseModel):
+    rules: dict[str, Stat]
+    traffic: dict[str, Stat]
+    categories: dict[str, Stat]
+    challenges: dict[str, Stat]
 
 
 class GuildInfo(BaseModel):
