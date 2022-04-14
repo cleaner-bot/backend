@@ -23,8 +23,7 @@ app = FastAPI()
 
 origins = [
     "https://cleaner.leodev.xyz",
-    # "http://localhost:3000",
-    # "https://cleaner-beta.leodev.xyz",
+    "http://localhost:3000",
 ]
 
 app.add_middleware(RatelimitMiddleware)
