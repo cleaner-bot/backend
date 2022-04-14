@@ -4,6 +4,7 @@ from cleaner_conf.guild import GuildConfig, GuildEntitlements
 
 
 class Stat(BaseModel):
+    total: int
     previous: int
     now: int
 
