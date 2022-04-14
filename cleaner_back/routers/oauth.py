@@ -24,6 +24,7 @@ scopes = ["identify", "guilds", "email"]
 
 allowed_components = (
     "",
+    "analytics",
     "firewall",
     "antispam",
     "antiraid",
