@@ -69,7 +69,7 @@ class GIGuild(BaseModel):
 class GIUser(BaseModel):
     id: str
     name: str
-    avatar: str
+    avatar: str | None
     is_dev: bool | None
 
 
