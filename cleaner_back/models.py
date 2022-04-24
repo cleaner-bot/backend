@@ -17,7 +17,7 @@ class RadarInfo(BaseModel):
     stats: dict[str, int]
 
 
-class Analytics(BaseModel):
+class StatisticsInfo(BaseModel):
     rules: dict[str, Stat]
     traffic: dict[str, Stat]
     categories: dict[str, Stat]
