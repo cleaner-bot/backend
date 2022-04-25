@@ -128,10 +128,10 @@ async def patch_guild_config(
         elif not await database.hexists(f"guild:{guild_id}:sync", "added"):
             raise HTTPException(404, "Guild not found")
 
-    allowed_keys = set(GuildConfig.__fields__)
-    not_allowed = set(changes) - allowed_keys
-    if not_allowed:
-        raise HTTPException(400, f"Unknown fields: {', '.join(not_allowed)}")
+    known_keys = set(GuildConfig.__fields__)
+    unknown_keys = set(changes) - known_keys
+    if unknown_keys:
+        raise HTTPException(400, f"Unknown fields: {', '.join(unknown_keys)}")
 
     try:
         config = GuildConfig.parse_obj(changes)
@@ -163,10 +163,10 @@ async def patch_guild_entitlement(
     if not has_access(user_id, Access.DEVELOPER):
         raise HTTPException(403, "No access")
 
-    allowed_keys = set(GuildEntitlements.__fields__)
-    not_allowed = set(changes) - allowed_keys
-    if not_allowed:
-        raise HTTPException(400, f"Unknown fields: {', '.join(not_allowed)}")
+    known_keys = set(GuildEntitlements.__fields__)
+    unknown_keys = set(changes) - known_keys
+    if unknown_keys:
+        raise HTTPException(400, f"Unknown fields: {', '.join(unknown_keys)}")
 
     try:
         entitlements = GuildEntitlements.parse_obj(changes)
