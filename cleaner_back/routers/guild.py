@@ -1,3 +1,5 @@
+import asyncio
+import os
 import typing
 
 from coredis import StrictRedis
@@ -199,6 +201,69 @@ async def post_guild_challenge_embed(
         "pubsub:challenge-send",
         msgpack.packb({"guild": int(guild_id), "channel": request.channel_id}),
     )
+
+
+@router.get("/guild/{guild_id}/backup/snapshot")
+async def get_guild_snapshots(
+    guild_id: str,
+    user_id: str = Depends(with_auth),
+    database: StrictRedis = Depends(with_database),
+):
+    await check_guild(user_id, guild_id, database)
+    await verify_guild_access(guild_id, database, "backup")
+
+    return [
+        {
+            "id": snapshot_id.decode(),
+            "timestamp": (snapshot := msgpack.unpackb(snapshot_raw))["timestamp"],
+            "channels": len(snapshot["channels"]),
+            "roles": len(snapshot["roles"]),
+        }
+        for snapshot_id, snapshot_raw in (await database.hgetall(
+            f"guild:{guild_id}:backup:snapshots"
+        )).items()
+    ]
+
+
+@router.post("/guild/{guild_id}/backup/snapshot", status_code=204)
+@limiter.limit("3/1h")
+async def post_guild_snaphost(
+    guild_id: str,
+    user_id: str = Depends(with_auth),
+    database: StrictRedis = Depends(with_database),
+):
+    await check_guild(user_id, guild_id, database)
+    await verify_guild_access(guild_id, database, "backup")
+
+    snapshot_id = os.urandom(16).hex()
+
+    pubsub = database.pubsub()
+    await pubsub.subscribe("pubsub:backup:snapshot:{snapshot_id}")
+
+    await database.publish("pubsub:backup:snapshot", f"{guild_id}:{snapshot_id}")
+
+    while True:
+        try:
+            message = await pubsub.get_message(timeout=10)
+        except asyncio.TimeoutError:
+            raise HTTPException(500, "Snapshot creation timed out")
+
+        if message["type"] == "message":
+            break
+
+
+@router.post("/guild/{guild_id}/backup/snapshot/{snapshot_id}")
+@limiter.limit("3/1h")
+async def post_apply_guild_snaphost(
+    guild_id: str,
+    snapshot_id: str,
+    user_id: str = Depends(with_auth),
+    database: StrictRedis = Depends(with_database),
+):
+    await check_guild(user_id, guild_id, database)
+    await verify_guild_access(guild_id, database, "backup")
+
+    await database.publish("pubsub:backup:apply-snapshot", f"{guild_id}:{snapshot_id}")
 
 
 @router.get("/guild/{guild_id}/logging/downloads", response_model=list[DownloadInfo])
