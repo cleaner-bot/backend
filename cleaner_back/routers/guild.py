@@ -44,6 +44,20 @@ async def check_guild(user_id: str, guild_id: str, database: StrictRedis):
     raise HTTPException(404, "Guild not found")
 
 
+async def verify_guild_access(
+    guild_id: str, database: StrictRedis, entitlement: str = None
+):
+    if await is_suspended(database, guild_id):
+        raise HTTPException(403, "Guild is suspended")
+    elif not await database.hexists(f"guild:{guild_id}:sync", "added"):
+        raise HTTPException(404, "Guild not found")
+
+    if entitlement is not None and not await has_entitlement(
+        database, guild_id, entitlement
+    ):
+        raise HTTPException(403, f"Guild does not have the {entitlement!r} entitlement")
+
+
 async def fetch_dict(database: StrictRedis, key: str, keys: typing.Sequence[str]):
     values = await database.hmget(key, keys)
     return {k: msgpack.unpackb(v) for k, v in zip(keys, values) if v is not None}
@@ -179,11 +193,8 @@ async def post_guild_challenge_embed(
     database: StrictRedis = Depends(with_database),
 ):
     await check_guild(user_id, guild_id, database)
+    await verify_guild_access(guild_id, database)
 
-    if await is_suspended(database, guild_id):
-        raise HTTPException(403, "Guild is suspended")
-    elif not await database.hexists(f"guild:{guild_id}:sync", "added"):
-        raise HTTPException(404, "Guild not found")
     await database.publish(
         "pubsub:challenge-send",
         msgpack.packb({"guild": int(guild_id), "channel": request.channel_id}),
@@ -197,15 +208,7 @@ async def get_guild_logging_downloads(
     database: StrictRedis = Depends(with_database),
 ):
     await check_guild(user_id, guild_id, database)
-
-    if await is_suspended(database, guild_id):
-        raise HTTPException(403, "Guild is suspended")
-    elif not await database.hexists(f"guild:{guild_id}:sync", "added"):
-        raise HTTPException(404, "Guild not found")
-    elif not await has_entitlement(database, guild_id, "logging_downloads"):
-        raise HTTPException(
-            403, "Guild does not have the 'logging_downloads' entitlement"
-        )
+    await verify_guild_access(guild_id, database, "logging_downloads")
 
     return [
         {"year": 2021, "month": 10, "expired": True},
@@ -223,13 +226,7 @@ async def get_guild_statistics(
     database: StrictRedis = Depends(with_database),
 ):
     await check_guild(user_id, guild_id, database)
-
-    if await is_suspended(database, guild_id):
-        raise HTTPException(403, "Guild is suspended")
-    elif not await database.hexists(f"guild:{guild_id}:sync", "added"):
-        raise HTTPException(404, "Guild not found")
-    elif not await has_entitlement(database, guild_id, "statistics"):
-        raise HTTPException(403, "Guild does not have the 'statistics' entitlement")
+    await verify_guild_access(guild_id, database, "statistics")
 
     data = await database.get(f"guild:{guild_id}:radar")
     if data is None:

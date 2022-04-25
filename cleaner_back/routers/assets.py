@@ -6,13 +6,8 @@ import os
 from coredis import StrictRedis
 from fastapi import APIRouter, Depends, HTTPException
 
-from .guild import check_guild
-from ..shared import (
-    has_entitlement,
-    is_suspended,
-    with_auth,
-    with_database,
-)
+from .guild import check_guild, verify_guild_access
+from ..shared import with_auth, with_database
 
 
 router = APIRouter()
@@ -40,15 +35,7 @@ async def get_guild(
     database: StrictRedis = Depends(with_database),
 ):
     await check_guild(user_id, guild_id, database)
-
-    if await is_suspended(database, guild_id):
-        raise HTTPException(403, "Guild is suspended")
-    elif not await database.hexists(f"guild:{guild_id}:sync", "added"):
-        raise HTTPException(404, "Guild not found")
-    elif not await has_entitlement(database, guild_id, "branding_splash"):
-        raise HTTPException(
-            403, "Guild does not have the 'branding_splash' entitlement"
-        )
+    await verify_guild_access(guild_id, database, "branding_splash")
 
     url = generate_upload_url(guild_id, "splash")
     return url
