@@ -243,12 +243,11 @@ async def post_guild_snaphost(
     await database.publish("pubsub:backup:snapshot", f"{guild_id}:{snapshot_id}")
 
     while True:
-        try:
-            message = await pubsub.get_message(timeout=10)
-        except asyncio.TimeoutError:
+        message = await pubsub.get_message(timeout=10)
+        
+        if message is None:
             raise HTTPException(500, "Snapshot creation timed out")
-
-        if message["type"] == "message":
+        elif message["type"] == "message":
             break
 
 
