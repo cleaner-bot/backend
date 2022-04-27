@@ -33,6 +33,7 @@ allowed_components = (
     "verification",
     "logging",
     "impersonation",
+    "report",
     "workers",
     "backup",
     "bot",
