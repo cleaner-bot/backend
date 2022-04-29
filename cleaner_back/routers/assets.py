@@ -29,7 +29,7 @@ def generate_upload_url(guild_id: str, category: str):
 
 
 @router.post("/guild/{guild_id}/assets/splash", response_model=str)
-async def get_guild(
+async def get_splash_asset_url(
     guild_id: str,
     user_id: str = Depends(with_auth),
     database: StrictRedis = Depends(with_database),
