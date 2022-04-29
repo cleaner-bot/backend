@@ -6,6 +6,7 @@ from cleaner_ratelimit import RatelimitMiddleware
 
 from .routers import (
     assets,
+    billing,
     challenge,
     downdoom,
     guild,
@@ -38,6 +39,7 @@ app.add_middleware(
 app.add_middleware(DBConnectErrorMiddleware)
 
 app.include_router(assets.router)
+app.include_router(billing.router)
 app.include_router(challenge.router)
 app.include_router(downdoom.router)
 app.include_router(guild.router)
