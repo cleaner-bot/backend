@@ -2,6 +2,7 @@ import os
 
 from async_stripe import stripe  # type: ignore
 from async_commerce_coinbase import Coinbase, webhook
+from async_commerce_coinbase.resources.charge import Charge
 from coredis import StrictRedis
 from fastapi import APIRouter, Depends, HTTPException, Request
 import msgpack  # type: ignore
@@ -66,7 +67,9 @@ async def get_stripe_portal(
     database: StrictRedis = Depends(with_database),
 ):
     if guild_id is not None:
-        customer_user, customer_platform = await database.hmget(f"guild:{guild_id}:subscription", ("user", "platform"))
+        customer_user, customer_platform = await database.hmget(
+            f"guild:{guild_id}:subscription", ("user", "platform")
+        )
         if customer_user is None:
             raise HTTPException(404, "Guild is not subscribed")
         elif user_id != customer_user.decode():
@@ -144,10 +147,9 @@ async def post_stripe_webhook(
         payload = {"guild_id": int(guild_id), "entitlements": operation}  # type: ignore
         await database.publish("pubsub:settings-update", msgpack.packb(payload))
 
-        await database.hset(f"guild:{guild_id}:subscription", {
-            "user": user_id,
-            "platform": "stripe"
-        })
+        await database.hset(
+            f"guild:{guild_id}:subscription", {"user": user_id, "platform": "stripe"}
+        )
 
     elif event["type"] == "customer.subscription.deleted":
         subscription = event["data"]["object"]
@@ -212,14 +214,14 @@ async def post_coinbase_webhook(
         raise HTTPException(400, "Invalid signature")
 
     if event["type"] in ("charge:confirmed", "charge:resolved"):
-        guild_id = event["data"]["metadata"]["guild"]
-        user_id = event["data"]["metadata"]["user"]
+        data: Charge = event["data"]  # type: ignore
+        guild_id = data["metadata"]["guild"]
+        user_id = data["metadata"]["user"]
         operation = {"plan": msgpack.packb(1)}
         await database.hset(f"guild:{guild_id}:entitlements", operation)  # type: ignore
         payload = {"guild_id": int(guild_id), "entitlements": operation}  # type: ignore
         await database.publish("pubsub:settings-update", msgpack.packb(payload))
 
-        await database.hset(f"guild:{guild_id}:subscription", {
-            "user": user_id,
-            "platform": "coinbase"
-        })
+        await database.hset(
+            f"guild:{guild_id}:subscription", {"user": user_id, "platform": "coinbase"}
+        )
