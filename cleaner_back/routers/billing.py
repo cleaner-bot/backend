@@ -27,7 +27,7 @@ async def get_stripe_checkout(
 ):
     await verify_guild_access(guild_id, database)
 
-    if await database.exists((f"guild:{guild_id}:pro-customer",)):
+    if await database.exists((f"guild:{guild_id}:subscription",)):
         raise HTTPException(400, "Guild is already subscribed")
 
     customer = await database.get(f"user:{user_id}:stripe:customer")
@@ -66,11 +66,13 @@ async def get_stripe_portal(
     database: StrictRedis = Depends(with_database),
 ):
     if guild_id is not None:
-        customer_user = await database.get(f"guild:{guild_id}:pro-customer")
+        customer_user, customer_platform = await database.hmget(f"guild:{guild_id}:subscription", ("user", "platform"))
         if customer_user is None:
             raise HTTPException(404, "Guild is not subscribed")
         elif user_id != customer_user.decode():
             raise HTTPException(403, "User is not original customer")
+        elif customer_platform != "stripe":
+            raise HTTPException(400, "Guild subscription does not use Stripe")
 
     customer = await database.get(f"user:{user_id}:stripe:customer")
     if customer is None:
@@ -142,7 +144,10 @@ async def post_stripe_webhook(
         payload = {"guild_id": int(guild_id), "entitlements": operation}  # type: ignore
         await database.publish("pubsub:settings-update", msgpack.packb(payload))
 
-        await database.set(f"guild:{guild_id}:pro-customer", user_id)
+        await database.hset(f"guild:{guild_id}:subscription", {
+            "user": user_id,
+            "platform": "stripe"
+        })
 
     elif event["type"] == "customer.subscription.deleted":
         subscription = event["data"]["object"]
@@ -153,13 +158,10 @@ async def post_stripe_webhook(
         payload = {"guild_id": int(guild_id), "entitlements": operation}  # type: ignore
         await database.publish("pubsub:settings-update", msgpack.packb(payload))
 
-        await database.delete((f"guild:{guild_id}:pro-customer",))
+        await database.delete((f"guild:{guild_id}:subscription",))
 
     elif event["type"] == "customer.subscription.updated":
         subscription = event["data"]["object"]
-
-    else:
-        print("Unhandled event type {}".format(event["type"]))
 
 
 @router.get("/billing/coinbase/checkout")
@@ -171,14 +173,14 @@ async def get_coinbase_checkout(
 ):
     await verify_guild_access(guild_id, database)
 
-    if await database.exists((f"guild:{guild_id}:pro-customer",)):
+    if await database.exists((f"guild:{guild_id}:subscription",)):
         raise HTTPException(400, "Guild is already subscribed")
     elif coinbase is None:
         raise HTTPException(500, "Configuration issue. Contact support")
 
     charge = await coinbase.create_charge(
         name="The Cleaner Pro",
-        description=f"The Cleaner Pro Yearly (30€) for {guild_id}",
+        description=f"The Cleaner Pro Yearly (30€) for guild {guild_id}",
         pricing_type="fixed_price",
         local_price={"amount": 30, "currency": "EUR"},
         redirect_url=f"{URL_ROOT}/billing/coinbase/success?guild={guild_id}",
@@ -186,7 +188,6 @@ async def get_coinbase_checkout(
         metadata={"guild": guild_id, "user": user_id},
     )
 
-    print(charge)
     return charge["hosted_url"]
 
 
@@ -210,4 +211,15 @@ async def post_coinbase_webhook(
     except stripe.error.SignatureVerificationError:
         raise HTTPException(400, "Invalid signature")
 
-    print(event)
+    if event["type"] in ("charge:confirmed", "charge:resolved"):
+        guild_id = event["data"]["metadata"]["guild"]
+        user_id = event["data"]["metadata"]["user"]
+        operation = {"plan": msgpack.packb(1)}
+        await database.hset(f"guild:{guild_id}:entitlements", operation)  # type: ignore
+        payload = {"guild_id": int(guild_id), "entitlements": operation}  # type: ignore
+        await database.publish("pubsub:settings-update", msgpack.packb(payload))
+
+        await database.hset(f"guild:{guild_id}:subscription", {
+            "user": user_id,
+            "platform": "coinbase"
+        })
