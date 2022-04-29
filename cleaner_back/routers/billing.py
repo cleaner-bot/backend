@@ -73,7 +73,7 @@ async def post_stripe_webhook(
     if sig_header is None:
         raise HTTPException(400, "Missing signature")
 
-    payload = await request.json()
+    payload = await request.body()
 
     try:
         event = stripe.Webhook.construct_event(
