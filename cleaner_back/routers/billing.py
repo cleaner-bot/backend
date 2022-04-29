@@ -24,6 +24,9 @@ async def get_stripe_checkout(
 ):
     await verify_guild_access(guild_id, database)
 
+    if await database.exists((f"guild:{guild_id}:pro-customer",)):
+        raise HTTPException(400, "Guild is already subscribed")
+
     customer = await database.get(f"user:{user_id}:stripe:customer")
 
     price = (
@@ -58,6 +61,13 @@ async def get_stripe_portal(
     user_id: str = Depends(with_auth),
     database: StrictRedis = Depends(with_database),
 ):
+    if guild_id is not None:
+        customer_user = await database.get(f"guild:{guild_id}:pro-customer")
+        if customer_user is None:
+            raise HTTPException(404, "Guild is not subscribed")
+        elif user_id != customer_user.decode():
+            raise HTTPException(403, "User is not original customer")
+
     customer = await database.get(f"user:{user_id}:stripe:customer")
     if customer is None:
         raise HTTPException(404, "User is not a customer")
@@ -122,10 +132,13 @@ async def post_stripe_webhook(
         subscription = event["data"]["object"]
 
         guild_id = subscription["metadata"]["guild"]
+        user_id = subscription["metadata"]["user"]
         operation = {"plan": msgpack.packb(1)}
         await database.hset(f"guild:{guild_id}:entitlements", operation)  # type: ignore
         payload = {"guild_id": int(guild_id), "entitlements": operation}  # type: ignore
         await database.publish("pubsub:settings-update", msgpack.packb(payload))
+
+        await database.set(f"guild:{guild_id}:pro-customer", user_id)
 
     elif event["type"] == "customer.subscription.deleted":
         subscription = event["data"]["object"]
@@ -135,6 +148,8 @@ async def post_stripe_webhook(
         await database.hset(f"guild:{guild_id}:entitlements", operation)  # type: ignore
         payload = {"guild_id": int(guild_id), "entitlements": operation}  # type: ignore
         await database.publish("pubsub:settings-update", msgpack.packb(payload))
+
+        await database.delete((f"guild:{guild_id}:pro-customer",))
 
     elif event["type"] == "customer.subscription.updated":
         subscription = event["data"]["object"]
