@@ -1,6 +1,7 @@
 import os
 
 from async_stripe import stripe  # type: ignore
+from async_commerce_coinbase import Coinbase, webhook
 from coredis import StrictRedis
 from fastapi import APIRouter, Depends, HTTPException, Request
 import msgpack  # type: ignore
@@ -11,6 +12,8 @@ from ..shared import with_auth, with_database, limiter
 
 router = APIRouter()
 stripe.api_key = os.getenv("SECRET_STRIPE_TOKEN")
+coinbase_api_key = os.getenv("SECRET_COINBASE_API")
+coinbase = Coinbase(coinbase_api_key) if coinbase_api_key else None
 URL_ROOT = "https://cleaner.leodev.xyz"
 
 
@@ -80,7 +83,7 @@ async def get_stripe_portal(
     return portal_session.url
 
 
-WEBHOOK_IPS = {
+STRIPE_WEBHOOK_IPS = {
     "3.18.12.63",
     "3.130.192.231",
     "13.235.14.237",
@@ -101,7 +104,7 @@ async def post_stripe_webhook(
     request: Request, database: StrictRedis = Depends(with_database)
 ):
     ip = request.headers.get("cf-connecting-ip", None)
-    if ip is None or ip not in WEBHOOK_IPS:
+    if ip is None or ip not in STRIPE_WEBHOOK_IPS:
         raise HTTPException(400, "IP lookup failed.")
 
     sig_header = request.headers.get("stripe-signature", None)
@@ -157,3 +160,54 @@ async def post_stripe_webhook(
 
     else:
         print("Unhandled event type {}".format(event["type"]))
+
+
+@router.get("/billing/coinbase/checkout")
+@limiter.limit("2/30", "10/1h")
+async def get_coinbase_checkout(
+    guild_id: str,
+    user_id: str = Depends(with_auth),
+    database: StrictRedis = Depends(with_database),
+):
+    await verify_guild_access(guild_id, database)
+
+    if await database.exists((f"guild:{guild_id}:pro-customer",)):
+        raise HTTPException(400, "Guild is already subscribed")
+    elif coinbase is None:
+        raise HTTPException(500, "Configuration issue. Contact support")
+
+    charge = await coinbase.create_charge(
+        name="The Cleaner Pro",
+        description=f"The Cleaner Pro Yearly (30€) for {guild_id}",
+        pricing_type="fixed_price",
+        local_price={"amount": 30, "currency": "EUR"},
+        redirect_url=f"{URL_ROOT}/billing/coinbase/success?guild={guild_id}",
+        cancel_url=f"{URL_ROOT}/billing/coinbase/cancelled?guild={guild_id}",
+        metadata={"guild": guild_id, "user": user_id},
+    )
+
+    print(charge)
+    return charge["hosted_url"]
+
+
+@router.post("/billing/coinbase/webhook", status_code=204)
+async def post_coinbase_webhook(
+    request: Request, database: StrictRedis = Depends(with_database)
+):
+    sig_header = request.headers.get("X-CC-Webhook-Signature", None)
+    if sig_header is None:
+        raise HTTPException(400, "Missing signature")
+
+    payload = await request.body()
+    webhook_secret = os.getenv("SECRET_COINBASE_WEBHOOK")
+    if webhook_secret is None:
+        raise HTTPException(500, "Configuration issue. Contact support")
+
+    try:
+        event = webhook.verify_signature(payload, sig_header, webhook_secret)
+    except ValueError:
+        raise HTTPException(400, "Invalid payload")
+    except stripe.error.SignatureVerificationError:
+        raise HTTPException(400, "Invalid signature")
+
+    print(event)
