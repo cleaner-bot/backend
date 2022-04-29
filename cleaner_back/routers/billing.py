@@ -65,7 +65,6 @@ async def get_stripe_portal(
     return portal_session.url
 
 
-
 WEBHOOK_IPS = {
     "3.18.12.63",
     "3.130.192.231",
@@ -80,6 +79,7 @@ WEBHOOK_IPS = {
     "54.187.205.235",
     "54.187.216.72",
 }
+
 
 @router.post("/billing/stripe/webhook", status_code=204)
 async def post_stripe_webhook(
