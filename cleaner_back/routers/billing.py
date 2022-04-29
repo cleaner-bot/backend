@@ -69,7 +69,7 @@ async def get_stripe_portal(
 async def post_stripe_webhook(
     request: Request, database: StrictRedis = Depends(with_database)
 ):
-    sig_header = request.headers.get("STRIPE_SIGNATURE", None)
+    sig_header = request.headers.get("stripe-signature", None)
     if sig_header is None:
         raise HTTPException(400, "Missing signature")
 
