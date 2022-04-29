@@ -107,7 +107,6 @@ async def post_stripe_webhook(
     except stripe.error.SignatureVerificationError:
         raise HTTPException(400, "Invalid signature")
 
-    print(event)
     # Handle the event
     if event["type"] == "checkout.session.completed":
         session = event["data"]["object"]
