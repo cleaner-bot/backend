@@ -38,15 +38,15 @@ app.add_middleware(
 )
 app.add_middleware(DBConnectErrorMiddleware)
 
-app.include_router(assets.router)
-app.include_router(billing.router)
-app.include_router(challenge.router)
-app.include_router(downdoom.router)
-app.include_router(guild.router)
-app.include_router(oauth.router)
-app.include_router(radar.router)
-app.include_router(user.router)
-app.include_router(verification.router)
+app.include_router(assets.router, tags=["assets"])
+app.include_router(billing.router, tags=["billing"])
+app.include_router(challenge.router, tags=["challenge"])
+app.include_router(downdoom.router, tags=["downdoom"])
+app.include_router(guild.router, tags=["guild"])
+app.include_router(oauth.router, tags=["oauth"])
+app.include_router(radar.router, tags=["radar"])
+app.include_router(user.router, tags=["user"])
+app.include_router(verification.router, tags=["verification"])
 
 app.state.limiter = limiter
 
