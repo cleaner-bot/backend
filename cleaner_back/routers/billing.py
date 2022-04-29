@@ -33,17 +33,19 @@ async def get_stripe_checkout(
         line_items=[
             {
                 "price": price,
-                "quantity": 1,
-                "metadata": {
-                    "user": user_id,
-                    "guild": guild_id,
-                },
+                "quantity": 1
             },
         ],
         mode="subscription",
         success_url=f"{URL_ROOT}/billing/stripe/success?guild={guild_id}",
         cancel_url=f"{URL_ROOT}/billing/stripe/cancelled?guild={guild_id}",
         customer=None if customer is None else customer.decode(),
+        subscription_data={
+            "metadata": {
+                "user": user_id,
+                "guild": guild_id,
+            },
+        }
     )
     return checkout_session.url
 
