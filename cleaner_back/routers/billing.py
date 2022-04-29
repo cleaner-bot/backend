@@ -54,6 +54,7 @@ async def get_stripe_checkout(
 @router.get("/billing/stripe/portal")
 @limiter.limit("2/30", "10/1h")
 async def get_stripe_portal(
+    guild_id: str = None,
     user_id: str = Depends(with_auth),
     database: StrictRedis = Depends(with_database),
 ):
@@ -63,7 +64,7 @@ async def get_stripe_portal(
 
     portal_session = await stripe.billing_portal.Session.create(
         customer=customer.decode(),
-        return_url=f"{URL_ROOT}/billing/stripe/portal",
+        return_url=f"{URL_ROOT}/dash/{guild_id}/plan" if guild_id else URL_ROOT,
     )
     return portal_session.url
 
