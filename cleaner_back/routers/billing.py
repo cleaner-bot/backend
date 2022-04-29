@@ -65,10 +65,30 @@ async def get_stripe_portal(
     return portal_session.url
 
 
+
+WEBHOOK_IPS = {
+    "3.18.12.63",
+    "3.130.192.231",
+    "13.235.14.237",
+    "13.235.122.149",
+    "18.211.135.69",
+    "35.154.171.200",
+    "52.15.183.38",
+    "54.88.130.119",
+    "54.88.130.237",
+    "54.187.174.169",
+    "54.187.205.235",
+    "54.187.216.72",
+}
+
 @router.post("/billing/stripe/webhook", status_code=204)
 async def post_stripe_webhook(
     request: Request, database: StrictRedis = Depends(with_database)
 ):
+    ip = request.headers.get("cf-connecting-ip", None)
+    if ip is None or ip not in WEBHOOK_IPS:
+        raise HTTPException(400, "IP lookup failed.")
+
     sig_header = request.headers.get("stripe-signature", None)
     if sig_header is None:
         raise HTTPException(400, "Missing signature")
