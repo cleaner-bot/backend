@@ -45,6 +45,7 @@ async def get_stripe_checkout(
             "guild": guild_id,
         },
         subscription_data={
+            "description": f"Subscription for guild: {guild_id}",
             "metadata": {
                 "user": user_id,
                 "guild": guild_id,
