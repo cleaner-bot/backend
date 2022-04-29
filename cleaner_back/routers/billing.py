@@ -34,15 +34,15 @@ async def get_stripe_checkout(
             {
                 "price": price,
                 "quantity": 1,
+                "metadata": {
+                    "user": user_id,
+                    "guild": guild_id,
+                },
             },
         ],
         mode="subscription",
         success_url=f"{URL_ROOT}/billing/stripe/success?guild={guild_id}",
         cancel_url=f"{URL_ROOT}/billing/stripe/cancelled?guild={guild_id}",
-        metadata={
-            "user": user_id,
-            "guild": guild_id,
-        },
         customer=None if customer is None else customer.decode(),
     )
     return checkout_session.url
@@ -98,7 +98,7 @@ async def post_stripe_webhook(
     elif event["type"] == "customer.subscription.created":
         subscription = event["data"]["object"]
 
-        guild_id = subscription["metadata"]["guild"]
+        guild_id = subscription["items"]["data"][0]["metadata"]["guild"]
         operation = {"plan": msgpack.packb(1)}
         await database.hset(f"guild:{guild_id}:entitlements", operation)  # type: ignore
         payload = {"guild_id": int(guild_id), "entitlements": operation}
@@ -107,7 +107,7 @@ async def post_stripe_webhook(
     elif event["type"] == "customer.subscription.deleted":
         subscription = event["data"]["object"]
 
-        guild_id = subscription["metadata"]["guild"]
+        guild_id = subscription["items"]["data"][0]["metadata"]["guild"]
         operation = {"plan": msgpack.packb(1)}
         await database.hset(f"guild:{guild_id}:entitlements", operation)  # type: ignore
         payload = {"guild_id": int(guild_id), "entitlements": operation}
