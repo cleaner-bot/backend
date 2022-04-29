@@ -37,6 +37,10 @@ async def get_stripe_checkout(
         success_url=f"{URL_ROOT}/billing/stripe/success?guild={guild_id}",
         cancel_url=f"{URL_ROOT}/billing/stripe/cancelled?guild={guild_id}",
         customer=None if customer is None else customer.decode(),
+        metadata={
+            "user": user_id,
+            "guild": guild_id,
+        },
         subscription_data={
             "metadata": {
                 "user": user_id,
