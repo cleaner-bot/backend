@@ -61,7 +61,7 @@ async def get_stripe_portal(
     if customer is None:
         raise HTTPException(404, "User is not a customer")
 
-    portal_session = stripe.billing_portal.Session.create(
+    portal_session = await stripe.billing_portal.Session.create(
         customer=customer.decode(),
         return_url=f"{URL_ROOT}/billing/stripe/portal",
     )
