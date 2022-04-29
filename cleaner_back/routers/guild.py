@@ -1,4 +1,3 @@
-import asyncio
 import os
 import typing
 
@@ -219,9 +218,9 @@ async def get_guild_snapshots(
             "channels": len(snapshot["channels"]),
             "roles": len(snapshot["roles"]),
         }
-        for snapshot_id, snapshot_raw in (await database.hgetall(
-            f"guild:{guild_id}:backup:snapshots"
-        )).items()
+        for snapshot_id, snapshot_raw in (
+            await database.hgetall(f"guild:{guild_id}:backup:snapshots")
+        ).items()
     ]
 
 
@@ -244,7 +243,7 @@ async def post_guild_snaphost(
 
     while True:
         message = await pubsub.get_message(timeout=10)
-        
+
         if message is None:
             raise HTTPException(500, "Snapshot creation timed out")
         elif message["type"] == "message":
