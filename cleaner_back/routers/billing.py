@@ -75,7 +75,7 @@ async def get_stripe_portal(
             raise HTTPException(404, "Guild is not subscribed")
         elif user_id != customer_user.decode():
             raise HTTPException(403, "User is not original customer")
-        elif customer_platform != "stripe":
+        elif customer_platform != b"stripe":
             raise HTTPException(400, "Guild subscription does not use Stripe")
 
     customer = await database.get(f"user:{user_id}:stripe:customer")
