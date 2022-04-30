@@ -80,12 +80,6 @@ class DetailedGuildInfo(BaseModel):
     user: GIUser
 
 
-class DownloadInfo(BaseModel):
-    year: int
-    month: int
-    expired: bool
-
-
 class ChallengerResponse(BaseModel):
     user: UserInfo
     is_valid: bool

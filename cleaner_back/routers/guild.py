@@ -264,24 +264,6 @@ async def post_apply_guild_snaphost(
     await database.publish("pubsub:backup:apply-snapshot", f"{guild_id}:{snapshot_id}")
 
 
-@router.get("/guild/{guild_id}/logging/downloads", response_model=list[DownloadInfo])
-async def get_guild_logging_downloads(
-    guild_id: str,
-    user_id: str = Depends(with_auth),
-    database: StrictRedis = Depends(with_database),
-):
-    await check_guild(user_id, guild_id, database)
-    await verify_guild_access(guild_id, database, "logging_downloads")
-
-    return [
-        {"year": 2021, "month": 10, "expired": True},
-        {"year": 2021, "month": 11, "expired": True},
-        {"year": 2021, "month": 12, "expired": False},
-        {"year": 2022, "month": 1, "expired": False},
-        {"year": 2022, "month": 2, "expired": False},
-    ]
-
-
 @router.get("/guild/{guild_id}/statistics", response_model=StatisticsInfo)
 async def get_guild_statistics(
     guild_id: str,
