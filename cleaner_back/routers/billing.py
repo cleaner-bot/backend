@@ -1,3 +1,4 @@
+from datetime import datetime
 import os
 
 from async_stripe import stripe  # type: ignore
@@ -223,5 +224,10 @@ async def post_coinbase_webhook(
         await database.publish("pubsub:settings-update", msgpack.packb(payload))
 
         await database.hset(
-            f"guild:{guild_id}:subscription", {"user": user_id, "platform": "coinbase"}
+            f"guild:{guild_id}:subscription",
+            {
+                "user": user_id,
+                "platform": "coinbase",
+                "started_at": datetime.utcnow().isoformat(),
+            },
         )
