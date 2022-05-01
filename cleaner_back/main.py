@@ -24,6 +24,10 @@ app = FastAPI()
 
 origins = [
     "https://cleaner.leodev.xyz",
+    "https://auth.cleanerbot.xyz",
+    "https://challenge.cleanerbot.xyz",
+    "https://dash.cleanerbot.xyz",
+    "https://verify.cleanerbot.xyz",
     "http://localhost:3000",
 ]
 
