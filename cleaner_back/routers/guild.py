@@ -18,7 +18,7 @@ from ..shared import (
     get_guilds,
     get_userme,
 )
-from ..models import DetailedGuildInfo, DownloadInfo, ChannelId, StatisticsInfo
+from ..models import DetailedGuildInfo, ChannelId, StatisticsInfo
 
 
 router = APIRouter()
