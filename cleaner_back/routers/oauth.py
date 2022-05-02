@@ -19,6 +19,7 @@ router = APIRouter()
 
 base = "/oauth2/authorize"
 redirect_uri = "https://cleaner.leodev.xyz/oauth-comeback"
+new_redirect_uri = "https://auth.cleanerbot.xyz/oauth"
 response_type = "code"
 scopes = ["identify", "guilds", "email"]
 
@@ -155,9 +156,11 @@ async def oauth_callback(
     if client_secret is None or client_id is None:
         raise HTTPException(500, "Configuration issue, please contact support")
 
+    this_redirect_uri = new_redirect_uri if state is None else redirect_uri
+
     try:
         authtoken = await hikari.authorize_access_token(
-            int(client_id), client_secret, code, redirect_uri
+            int(client_id), client_secret, code, this_redirect_uri
         )
     except BadRequestError:
         await database.delete((f"dash:oauth:state:{state}",))
