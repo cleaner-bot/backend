@@ -2,7 +2,7 @@ import os
 import typing
 
 from coredis import StrictRedis
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import ValidationError
 import msgpack  # type: ignore
 
@@ -10,6 +10,7 @@ from cleaner_conf.guild import GuildConfig, GuildEntitlements
 
 from ..access import has_access, Access
 from ..shared import (
+    get_entitlement,
     with_auth,
     with_database,
     limiter,
@@ -182,6 +183,26 @@ async def patch_guild_entitlement(
     )
 
     payload = {"guild_id": int(guild_id), "entitlements": as_dict}
+    await database.publish("pubsub:settings-update", msgpack.packb(payload))
+
+
+@router.put("/guild/{guild_id}/worker", status_code=204)
+async def put_worker(
+    guild_id: str,
+    request: Request,
+    user_id: str = Depends(with_auth),
+    database: StrictRedis = Depends(with_database),
+):
+    await check_guild(user_id, guild_id, database)
+    await verify_guild_access(guild_id, database, "workers")
+
+    body = await request.body()
+    workers_size = await get_entitlement(database, guild_id, "workers_size")
+    if len(body) > workers_size:
+        raise HTTPException(400, "Script too large")
+
+    await database.set(f"guild:{guild_id}:worker", body)
+    payload = {"guild_id": int(guild_id), "worker": body}
     await database.publish("pubsub:settings-update", msgpack.packb(payload))
 
 
