@@ -6,31 +6,19 @@ from fastapi import APIRouter, Depends, HTTPException
 from jose import jws  # type: ignore
 
 from .guild import get_guilds
-from ..shared import with_auth, with_database, limiter, is_suspended
-from ..models import GuildInfo, RemoteAuth
+from ..shared import with_auth, with_database, limiter, is_suspended, get_userme
+from ..models import GuildInfo, RemoteAuth, UserInfo
 
 
 router = APIRouter()
 
 
-# @router.get("/user/@me", response_model=UserInfo)
-# @limiter.limit("5/5")
-# async def user_me(
-#     user_id: str = Depends(with_auth),
-#     database: StrictRedis = Depends(with_database),
-# ):
-#     return await get_userme(database, user_id)
-
-
-# @router.get("/user/@me/account", response_model=Account)
-# @limiter.limit("5/5")
-# async def user_me_account(
-#     user_id: str = Depends(with_auth),
-#     database: StrictRedis = Depends(with_database),
-# ):
-#     userobj = await get_userme(database, user_id)
-
-#     return {"user": userobj, "subscriptions": [], "receipts": []}
+@router.get("/user/@me", response_model=UserInfo)
+async def user_me(
+    user_id: str = Depends(with_auth),
+    database: StrictRedis = Depends(with_database),
+):
+    return await get_userme(database, user_id)
 
 
 @router.delete("/user/@me/sessions", status_code=204)
