@@ -204,4 +204,8 @@ async def oauth_callback(
         redirect_target = f"/dash/{authtoken.guild.id}"
         await database.hset(f"guild:{authtoken.guild.id}:sync", {"added": 1})
 
-    return {"token": token, "redirect": redirect_target}
+    return {
+        "token": token,
+        "redirect": redirect_target,
+        "guild": None if authtoken.guild is None else str(authtoken.guild.id),
+    }
