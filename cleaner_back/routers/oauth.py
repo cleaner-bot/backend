@@ -53,7 +53,6 @@ async def oauth_redirect(
     guild: str = None,
     component: str = None,
     flow: str = None,
-    database: StrictRedis = Depends(with_database),
 ):
     if flow is not None:
         if len(flow) != 64 or not all(x in "0123456789abcdef" for x in flow):
