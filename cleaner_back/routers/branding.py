@@ -62,14 +62,14 @@ async def put_branding_vanity(
             raise HTTPException(400, "Vanity url is already taken")
     elif not old_vanity:
         raise HTTPException(400, "No vanity url set")
-    
+
     if vanity:
         await database.set(f"vanity:{vanity}", guild_id)
     await database.delete((f"vanity:{old_vanity}",))
 
     operation = {"branding_vanity_url": msgpack.packb(vanity)}
-    await database.hset(f"guild:{guild_id}:entitlements", operation)
-    payload = {"guild_id": int(guild_id), "entitlements": operation}
+    await database.hset(f"guild:{guild_id}:entitlements", operation)  # type: ignore
+    payload = {"guild_id": int(guild_id), "entitlements": operation}  # type: ignore
     await database.publish("pubsub:settings-update", msgpack.packb(payload))
 
 
@@ -77,7 +77,7 @@ async def put_branding_vanity(
 async def get_vanity(vanity: str, database: StrictRedis = Depends(with_database)):
     if not re.fullmatch(r"[a-z\d-]{2,32}", vanity):
         raise HTTPException(404, "Vanity not found")
-    vanity = await database.get(f"vanity:{vanity}")
-    if vanity is None:
+    guild = await database.get(f"vanity:{vanity}")
+    if guild is None:
         raise HTTPException(404, "Vanity not found")
-    return vanity.decode()
+    return guild.decode()
