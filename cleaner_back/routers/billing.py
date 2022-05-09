@@ -15,7 +15,7 @@ router = APIRouter()
 stripe.api_key = os.getenv("SECRET_STRIPE_TOKEN")
 coinbase_api_key = os.getenv("SECRET_COINBASE_API")
 coinbase = Coinbase(coinbase_api_key) if coinbase_api_key else None
-URL_ROOT = "https://cleaner.leodev.xyz"
+URL_ROOT = "https://cleanerbot.xyz"
 
 
 @router.get("/billing/stripe/checkout")

@@ -12,10 +12,10 @@ from hikari import Permissions, RESTApp, UnauthorizedError
 from httpx import AsyncClient
 from jose import jws  # type: ignore
 
-home = "https://cleaner.leodev.xyz"
+home = "https://cleanerbot.xyz"
 redis_db = os.getenv("REDIS_URL")
 redis = StrictRedis.from_url(redis_db) if redis_db is not None else StrictRedis()
-aclient = AsyncClient(headers={"user-agent": "CleanerBot (cleaner.leodev.xyz 0.1.0)"})
+aclient = AsyncClient(headers={"user-agent": "CleanerBot (cleanerbot.xyz 0.1.0)"})
 hikari_rest = RESTApp()
 
 
@@ -208,7 +208,7 @@ if cf_email is not None and cf_key is not None:
         cf_email,
         cf_key,
         zone,
-        "Banned for exceeding ratelimits on cleaner.leodev.xyz/api",
+        "Banned for exceeding ratelimits on api.cleanerbot.xyz",
     )
 
 limiter.jail = Jail(get_visitor_ip, "50/5m", reporter)

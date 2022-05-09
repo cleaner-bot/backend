@@ -22,7 +22,6 @@ app = FastAPI()
 
 
 origins = [
-    "https://cleaner.leodev.xyz",
     "https://cleanerbot.xyz",
     "http://localhost:3000",
 ]
