@@ -73,11 +73,11 @@ async def put_branding_vanity(
     await database.publish("pubsub:settings-update", msgpack.packb(payload))
 
 
-@router.get("/vanity/{vanity}", status_code=200)
+@router.get("/vanity/{vanity}", status_code=200, response_model=int)
 async def get_vanity(vanity: str, database: StrictRedis = Depends(with_database)):
     if not re.fullmatch(r"[a-z\d-]{2,32}", vanity):
         raise HTTPException(404, "Vanity not found")
     guild = await database.get(f"vanity:{vanity}")
     if guild is None:
         raise HTTPException(404, "Vanity not found")
-    return guild.decode()
+    return int(guild)
