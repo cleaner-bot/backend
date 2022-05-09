@@ -95,7 +95,7 @@ async def get_entitlement(
     value = await database.hget(f"guild:{guild_id}:entitlements", name)
     if value is None:
         return GuildEntitlements.__fields__[name].default
-    return GuildEntitlements(suspended=msgpack.unpackb(value)).suspended
+    return getattr(GuildEntitlements(**{name: msgpack.unpackb(value)}), name)
 
 
 async def get_config(database: StrictRedis, guild_id: str | int, name: str):
