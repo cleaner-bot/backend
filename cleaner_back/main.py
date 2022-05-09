@@ -6,8 +6,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .middleware import DBConnectErrorMiddleware
 from .routers import (
-    assets,
     billing,
+    branding,
     challenge,
     downdoom,
     guild,
@@ -37,8 +37,8 @@ app.add_middleware(
 )
 app.add_middleware(DBConnectErrorMiddleware)
 
-app.include_router(assets.router, tags=["assets"])
 app.include_router(billing.router, tags=["billing"])
+app.include_router(branding.router, tags=["branding"])
 app.include_router(challenge.router, tags=["challenge"])
 app.include_router(downdoom.router, tags=["downdoom"])
 app.include_router(guild.router, tags=["guild"])
