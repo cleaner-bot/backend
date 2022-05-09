@@ -24,7 +24,7 @@ def generate_upload_url(guild_id: str, category: str):
     mac = hmac.new(key.encode(), data.encode(), "sha256").digest()
 
     mac64 = urlsafe_b64encode(mac).decode().strip("=")
-    return f"https://cleaner-cdn.leodev.xyz/{category}/{guild_id}/{expire}/{mac64}"
+    return f"https://cdn.cleanerbot.xyz/{category}/{guild_id}/{expire}/{mac64}"
 
 
 @router.post("/guild/{guild_id}/assets/splash", response_model=str)
