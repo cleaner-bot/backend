@@ -17,8 +17,7 @@ router = APIRouter()
 
 
 base = "/oauth2/authorize"
-redirect_uri = "https://cleaner.leodev.xyz/oauth-comeback"
-new_redirect_uri = "https://auth.cleanerbot.xyz/oauth"
+redirect_uri = "https://cleanerbot.xyz/oauth-comeback"
 response_type = "code"
 scopes = ["identify", "guilds", "email"]
 
@@ -154,7 +153,7 @@ async def oauth_callback(
     if client_secret is None or client_id is None:
         raise HTTPException(500, "Configuration issue, please contact support")
 
-    this_redirect_uri = new_redirect_uri if state is None else redirect_uri
+    this_redirect_uri = redirect_uri
 
     try:
         authtoken = await hikari.authorize_access_token(
