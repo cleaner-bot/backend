@@ -1,14 +1,13 @@
-from datetime import datetime, timedelta
 import os
+from datetime import datetime, timedelta
 
 from coredis import StrictRedis
 from fastapi import APIRouter, Depends, HTTPException
 from jose import jws  # type: ignore
 
-from .guild import get_guilds
-from ..shared import with_auth, with_database, limiter, is_suspended, get_userme
 from ..models import GuildInfo, RemoteAuth, UserInfo
-
+from ..shared import get_userme, is_suspended, limiter, with_auth, with_database
+from .guild import get_guilds
 
 router = APIRouter()
 

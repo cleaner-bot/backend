@@ -1,20 +1,18 @@
 import os
 
+import msgpack  # type: ignore
 from coredis import StrictRedis
 from fastapi import APIRouter, Depends, HTTPException
-import msgpack  # type: ignore
 
-
+from ..models import ChallengerRequest, ChallengerResponse
 from ..shared import (
-    with_auth,
-    with_database,
     aclient,
-    has_entitlement,
     get_config,
     get_userme,
+    has_entitlement,
+    with_auth,
+    with_database,
 )
-from ..models import ChallengerResponse, ChallengerRequest
-
 
 router = APIRouter()
 

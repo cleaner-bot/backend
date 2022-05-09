@@ -1,18 +1,17 @@
-from datetime import datetime, timedelta
 import os
+from datetime import datetime, timedelta
 from urllib.parse import urlencode
 
+import msgpack  # type: ignore
 from coredis import StrictRedis
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import RedirectResponse
-from hikari import BadRequestError, UnauthorizedError, Permissions
-from hikari.urls import BASE_URL
+from hikari import BadRequestError, Permissions, UnauthorizedError
 from hikari.impl import RESTClientImpl
+from hikari.urls import BASE_URL
 from jose import jws  # type: ignore
-import msgpack  # type: ignore
 
-from ..shared import with_database, with_hikari, hikari_rest, limiter
-
+from ..shared import hikari_rest, limiter, with_database, with_hikari
 
 router = APIRouter()
 

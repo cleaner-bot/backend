@@ -1,10 +1,9 @@
+import msgpack  # type: ignore
 from coredis import StrictRedis
 from fastapi import APIRouter, Depends, HTTPException
-import msgpack  # type: ignore
 
 from ..models import RadarInfo
 from ..shared import with_database
-
 
 router = APIRouter()
 

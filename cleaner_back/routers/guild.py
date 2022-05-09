@@ -1,26 +1,24 @@
 import os
 import typing
 
+import msgpack  # type: ignore
+from cleaner_conf.guild import GuildConfig, GuildEntitlements
 from coredis import StrictRedis
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import ValidationError
-import msgpack  # type: ignore
 
-from cleaner_conf.guild import GuildConfig, GuildEntitlements
-
-from ..access import has_access, Access
+from ..access import Access, has_access
+from ..models import ChannelId, DetailedGuildInfo, StatisticsInfo
 from ..shared import (
     get_entitlement,
-    with_auth,
-    with_database,
-    limiter,
-    has_entitlement,
-    is_suspended,
     get_guilds,
     get_userme,
+    has_entitlement,
+    is_suspended,
+    limiter,
+    with_auth,
+    with_database,
 )
-from ..models import DetailedGuildInfo, ChannelId, StatisticsInfo
-
 
 router = APIRouter()
 

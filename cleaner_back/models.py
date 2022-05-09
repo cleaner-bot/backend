@@ -1,6 +1,5 @@
-from pydantic import BaseModel
-
 from cleaner_conf.guild import GuildConfig, GuildEntitlements
+from pydantic import BaseModel
 
 
 class Stat(BaseModel):

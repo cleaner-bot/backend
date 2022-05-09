@@ -1,9 +1,10 @@
 import os
 
+from cleaner_ratelimit import RatelimitMiddleware
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from cleaner_ratelimit import RatelimitMiddleware
 
+from .middleware import DBConnectErrorMiddleware
 from .routers import (
     assets,
     billing,
@@ -16,8 +17,6 @@ from .routers import (
     verification,
 )
 from .shared import limiter
-from .middleware import DBConnectErrorMiddleware
-
 
 app = FastAPI()
 

@@ -3,18 +3,16 @@ import os
 from coredis import StrictRedis
 from fastapi import APIRouter, Depends, HTTPException
 
-
+from ..models import ChallengerRequest, ChallengerResponse
 from ..shared import (
-    with_auth,
-    with_optional_auth,
-    with_database,
     aclient,
-    has_entitlement,
     get_config,
     get_userme,
+    has_entitlement,
+    with_auth,
+    with_database,
+    with_optional_auth,
 )
-from ..models import ChallengerResponse, ChallengerRequest
-
 
 router = APIRouter()
 

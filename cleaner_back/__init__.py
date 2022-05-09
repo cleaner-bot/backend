@@ -8,5 +8,4 @@ load_dotenv(Path("~/.cleaner/env_backend").expanduser())
 
 from .main import app  # noqa: E402
 
-
 __all__ = ["app"]

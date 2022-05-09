@@ -1,10 +1,8 @@
 import asyncio
 import os
 
-from fastapi import APIRouter
-
 from downdoom import Client
-
+from fastapi import APIRouter
 
 router = APIRouter()
 
