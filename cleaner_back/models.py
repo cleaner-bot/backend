@@ -83,7 +83,7 @@ class ChallengerResponse(BaseModel):
     user: UserInfo
     is_valid: bool
     captcha_required: bool
-    splash: bool
+    splash: str | None
 
 
 class ChallengerRequest(BaseModel):

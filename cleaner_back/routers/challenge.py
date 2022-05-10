@@ -41,10 +41,10 @@ async def get_challenge(
 
     user = await get_userme(database, auth_user_id)
 
-    splash = False
+    splash = None
     if await has_entitlement(database, guild_id.decode(), "branding_splash"):
         if await get_config(database, guild_id.decode(), "branding_splash_enabled"):
-            splash = True
+            splash = f"https://cdn.cleanerbot.xyz/splash/{guild_id}"
 
     return {
         "user": user,
