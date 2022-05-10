@@ -51,6 +51,7 @@ async def oauth_redirect(
     guild: str = None,
     component: str = None,
     flow: str = None,
+    change: bool = False,
 ):
     if flow is not None:
         if len(flow) != 64 or not all(x in "0123456789abcdef" for x in flow):
@@ -83,8 +84,10 @@ async def oauth_redirect(
         "response_type": response_type,
         "scope": " ".join(scopes),
         "state": state,
-        "prompt": "none",
     }
+
+    if not change:
+        query["prompt"] = "none"
 
     if bot:
         permissions = (
