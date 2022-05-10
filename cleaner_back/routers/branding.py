@@ -8,7 +8,14 @@ import msgpack  # type: ignore
 from coredis import StrictRedis
 from fastapi import APIRouter, Depends, HTTPException, Request
 
-from ..shared import get_entitlement, with_auth, with_database
+from ..models import VanityResponse
+from ..shared import (
+    get_config,
+    get_entitlement,
+    has_entitlement,
+    with_auth,
+    with_database,
+)
 from .guild import check_guild, verify_guild_access
 
 router = APIRouter()
@@ -73,11 +80,20 @@ async def put_branding_vanity(
     await database.publish("pubsub:settings-update", msgpack.packb(payload))
 
 
-@router.get("/vanity/{vanity}", status_code=200, response_model=int)
+@router.get("/vanity/{vanity}", response_model=VanityResponse)
 async def get_vanity(vanity: str, database: StrictRedis = Depends(with_database)):
     if not re.fullmatch(r"[a-z\d-]{2,32}", vanity):
         raise HTTPException(404, "Vanity not found")
     guild = await database.get(f"vanity:{vanity}")
     if guild is None:
         raise HTTPException(404, "Vanity not found")
-    return int(guild)
+
+    splash = False
+    if await has_entitlement(database, guild.decode(), "branding_splash"):
+        if await get_config(database, guild.decode(), "branding_splash_enabled"):
+            splash = True
+
+    return {
+        "guild": guild,
+        "splash": splash,
+    }

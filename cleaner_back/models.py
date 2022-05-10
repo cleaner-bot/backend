@@ -83,11 +83,16 @@ class ChallengerResponse(BaseModel):
     user: UserInfo
     is_valid: bool
     captcha_required: bool
-    splash: str | None
+    splash: bool
 
 
 class ChallengerRequest(BaseModel):
     token: str | None
+
+
+class VanityResponse(BaseModel):
+    guild: str
+    splash: bool
 
 
 class ChannelId(BaseModel):

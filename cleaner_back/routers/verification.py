@@ -32,10 +32,10 @@ async def get_verification(
 
     user = await get_userme(database, user_id)
 
-    splash = None
+    splash = False
     if await has_entitlement(database, guild, "branding_splash"):
         if await get_config(database, guild, "branding_splash_enabled"):
-            splash = f"https://cdn.cleanerbot.xyz/splash/{guild}"
+            splash = True
 
     return {
         "user": user,
