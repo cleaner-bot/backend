@@ -1,7 +1,7 @@
 fastapi>=0.68,<0.78
 uvicorn[standard]>=0.15,<0.18
 pydantic>=1.9,<1.10
-coredis>=3.4,<3.5
+coredis>=3.4,<3.6
 httpx>=0.16,<1
 python-jose>=3.3,<3.4
 hikari==2.0.0.dev108
