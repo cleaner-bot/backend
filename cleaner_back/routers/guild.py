@@ -56,7 +56,7 @@ async def verify_guild_access(guild_id: str, database: Redis, entitlement: str =
         raise HTTPException(403, f"Guild does not have the {entitlement!r} entitlement")
 
 
-async def fetch_dict(database: Redis, key: str, keys: typing.Sequence[str]):
+async def fetch_dict(database: Redis, key: str, keys: typing.Tuple[str, ...]):
     values = await database.hmget(key, keys)
     return {k: msgpack.unpackb(v) for k, v in zip(keys, values) if v is not None}
 
