@@ -3,7 +3,7 @@ import typing
 
 import msgpack  # type: ignore
 from cleaner_conf.guild import GuildConfig, GuildEntitlements
-from coredis import StrictRedis
+from coredis import Redis
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import ValidationError
 
@@ -23,7 +23,7 @@ from ..shared import (
 router = APIRouter()
 
 
-async def check_guild(user_id: str, guild_id: str, database: StrictRedis):
+async def check_guild(user_id: str, guild_id: str, database: Redis):
     guilds = await get_guilds(database, user_id)
     for guild in guilds:
         if guild["id"] == guild_id:
@@ -44,9 +44,7 @@ async def check_guild(user_id: str, guild_id: str, database: StrictRedis):
     raise HTTPException(404, "Guild not found")
 
 
-async def verify_guild_access(
-    guild_id: str, database: StrictRedis, entitlement: str = None
-):
+async def verify_guild_access(guild_id: str, database: Redis, entitlement: str = None):
     if await is_suspended(database, guild_id):
         raise HTTPException(403, "Guild is suspended")
     elif not await database.hexists(f"guild:{guild_id}:sync", "added"):
@@ -58,7 +56,7 @@ async def verify_guild_access(
         raise HTTPException(403, f"Guild does not have the {entitlement!r} entitlement")
 
 
-async def fetch_dict(database: StrictRedis, key: str, keys: typing.Sequence[str]):
+async def fetch_dict(database: Redis, key: str, keys: typing.Sequence[str]):
     values = await database.hmget(key, keys)
     return {k: msgpack.unpackb(v) for k, v in zip(keys, values) if v is not None}
 
@@ -67,7 +65,7 @@ async def fetch_dict(database: StrictRedis, key: str, keys: typing.Sequence[str]
 async def get_guild(
     guild_id: str,
     user_id: str = Depends(with_auth),
-    database: StrictRedis = Depends(with_database),
+    database: Redis = Depends(with_database),
 ):
     try:
         guild = await check_guild(user_id, guild_id, database)
@@ -116,7 +114,7 @@ async def patch_guild_config(
     guild_id: str,
     changes: dict[str, typing.Any],
     user_id: str = Depends(with_auth),
-    database: StrictRedis = Depends(with_database),
+    database: Redis = Depends(with_database),
 ):
     await check_guild(user_id, guild_id, database)
 
@@ -154,7 +152,7 @@ async def patch_guild_entitlement(
     guild_id: str,
     changes: dict[str, typing.Any],
     user_id: str = Depends(with_auth),
-    database: StrictRedis = Depends(with_database),
+    database: Redis = Depends(with_database),
 ):
     await check_guild(user_id, guild_id, database)
 
@@ -189,7 +187,7 @@ async def put_worker(
     guild_id: str,
     request: Request,
     user_id: str = Depends(with_auth),
-    database: StrictRedis = Depends(with_database),
+    database: Redis = Depends(with_database),
 ):
     await check_guild(user_id, guild_id, database)
     await verify_guild_access(guild_id, database, "workers")
@@ -210,7 +208,7 @@ async def post_guild_challenge_embed(
     guild_id: str,
     request: ChannelId,
     user_id: str = Depends(with_auth),
-    database: StrictRedis = Depends(with_database),
+    database: Redis = Depends(with_database),
 ):
     await check_guild(user_id, guild_id, database)
     await verify_guild_access(guild_id, database)
@@ -225,7 +223,7 @@ async def post_guild_challenge_embed(
 async def get_guild_snapshots(
     guild_id: str,
     user_id: str = Depends(with_auth),
-    database: StrictRedis = Depends(with_database),
+    database: Redis = Depends(with_database),
 ):
     await check_guild(user_id, guild_id, database)
     await verify_guild_access(guild_id, database, "backup")
@@ -248,7 +246,7 @@ async def get_guild_snapshots(
 async def post_guild_snaphost(
     guild_id: str,
     user_id: str = Depends(with_auth),
-    database: StrictRedis = Depends(with_database),
+    database: Redis = Depends(with_database),
 ):
     await check_guild(user_id, guild_id, database)
     await verify_guild_access(guild_id, database, "backup")
@@ -275,7 +273,7 @@ async def post_apply_guild_snaphost(
     guild_id: str,
     snapshot_id: str,
     user_id: str = Depends(with_auth),
-    database: StrictRedis = Depends(with_database),
+    database: Redis = Depends(with_database),
 ):
     await check_guild(user_id, guild_id, database)
     await verify_guild_access(guild_id, database, "backup")
@@ -287,7 +285,7 @@ async def post_apply_guild_snaphost(
 async def get_guild_statistics(
     guild_id: str,
     user_id: str = Depends(with_auth),
-    database: StrictRedis = Depends(with_database),
+    database: Redis = Depends(with_database),
 ):
     await check_guild(user_id, guild_id, database)
     await verify_guild_access(guild_id, database, "statistics")

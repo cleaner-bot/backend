@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 from urllib.parse import urlencode
 
 import msgpack  # type: ignore
-from coredis import StrictRedis
+from coredis import Redis
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import RedirectResponse
 from hikari import BadRequestError, Permissions, UnauthorizedError
@@ -120,7 +120,7 @@ async def oauth_redirect(
 async def oauth_callback(
     code: str = None,
     state: str = None,
-    database: StrictRedis = Depends(with_database),
+    database: Redis = Depends(with_database),
     hikari: RESTClientImpl = Depends(with_hikari),
 ):
     if state is None or state[0] == "1":

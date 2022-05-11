@@ -1,7 +1,7 @@
 import os
 
 import msgpack  # type: ignore
-from coredis import StrictRedis
+from coredis import Redis
 from fastapi import APIRouter, Depends, HTTPException
 
 from ..models import ChallengerRequest, ChallengerResponse
@@ -21,7 +21,7 @@ router = APIRouter()
 async def get_verification(
     guild: int,
     user_id: str = Depends(with_auth),
-    database: StrictRedis = Depends(with_database),
+    database: Redis = Depends(with_database),
 ):
     if not await database.hexists(f"guild:{guild}:sync", "added"):
         raise HTTPException(404, "Guild not found")
@@ -52,7 +52,7 @@ async def post_verification(
     guild: int,
     body: ChallengerRequest,
     user_id: str = Depends(with_auth),
-    database: StrictRedis = Depends(with_database),
+    database: Redis = Depends(with_database),
 ):
     if not await database.hexists(f"guild:{guild}:sync", "added"):
         raise HTTPException(404, "Guild not found")

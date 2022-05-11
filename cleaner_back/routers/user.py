@@ -1,7 +1,7 @@
 import os
 from datetime import datetime, timedelta
 
-from coredis import StrictRedis
+from coredis import Redis
 from fastapi import APIRouter, Depends, HTTPException
 from jose import jws  # type: ignore
 
@@ -15,7 +15,7 @@ router = APIRouter()
 @router.get("/user/@me", response_model=UserInfo)
 async def user_me(
     user_id: str = Depends(with_auth),
-    database: StrictRedis = Depends(with_database),
+    database: Redis = Depends(with_database),
 ):
     return await get_userme(database, user_id)
 
@@ -23,7 +23,7 @@ async def user_me(
 @router.delete("/user/@me/sessions", status_code=204)
 @limiter.limit("2/5minute")
 async def user_me_delete_sessions(
-    user_id: str = Depends(with_auth), database: StrictRedis = Depends(with_database)
+    user_id: str = Depends(with_auth), database: Redis = Depends(with_database)
 ):
     sessions = []
     async for session in database.scan_iter(f"user:{user_id}:dash:session:*"):
@@ -34,7 +34,7 @@ async def user_me_delete_sessions(
 
 @router.get("/user/@me/guilds", response_model=list[GuildInfo])
 async def user_me_guilds(
-    user_id: str = Depends(with_auth), database: StrictRedis = Depends(with_database)
+    user_id: str = Depends(with_auth), database: Redis = Depends(with_database)
 ):
     guilds = await get_guilds(database, user_id)
     for guild in guilds:
@@ -48,7 +48,7 @@ async def user_me_guilds(
 @limiter.limit("5/1h")
 async def user_me_remote_auth(
     user_id: str = Depends(with_auth),
-    database: StrictRedis = Depends(with_database),
+    database: Redis = Depends(with_database),
 ):
     code = os.urandom(32).hex()
     await database.set(f"remote-auth:{code}", user_id, ex=300)
@@ -57,7 +57,7 @@ async def user_me_remote_auth(
 
 @router.post("/remote-auth")
 @limiter.limit("5/1h")
-async def remote_auth(auth: RemoteAuth, database: StrictRedis = Depends(with_database)):
+async def remote_auth(auth: RemoteAuth, database: Redis = Depends(with_database)):
     code = auth.code
     if len(code) != 64 or not all(x in "0123456789abcdef" for x in code):
         raise HTTPException(400, "Bad code")

@@ -6,7 +6,7 @@ import msgpack  # type: ignore
 from cleaner_conf.guild import GuildConfig, GuildEntitlements
 from cleaner_ratelimit import Limiter, get_visitor_ip
 from cleaner_ratelimit.jail import CloudflareIPAccessRuleReporter, Jail
-from coredis import StrictRedis
+from coredis import Redis
 from fastapi import Depends, Header, HTTPException
 from hikari import Permissions, RESTApp, UnauthorizedError
 from httpx import AsyncClient
@@ -14,12 +14,12 @@ from jose import jws  # type: ignore
 
 home = "https://cleanerbot.xyz"
 redis_db = os.getenv("REDIS_URL")
-redis = StrictRedis.from_url(redis_db) if redis_db is not None else StrictRedis()
+redis = Redis.from_url(redis_db) if redis_db is not None else Redis()
 aclient = AsyncClient(headers={"user-agent": "CleanerBot (cleanerbot.xyz 0.1.0)"})
 hikari_rest = RESTApp()
 
 
-def with_database() -> StrictRedis:
+def with_database() -> Redis:
     return redis
 
 
@@ -34,7 +34,7 @@ async def with_hikari():
 
 
 async def with_auth(
-    x_token: str = Header(None), database: StrictRedis = Depends(with_database)
+    x_token: str = Header(None), database: Redis = Depends(with_database)
 ):
     if x_token is None:
         raise HTTPException(401, "Missing X-Token header")
@@ -58,7 +58,7 @@ async def with_auth(
 
 
 async def with_optional_auth(
-    x_token: str = Header(None), database: StrictRedis = Depends(with_database)
+    x_token: str = Header(None), database: Redis = Depends(with_database)
 ):
     try:
         return await with_auth(x_token, database)
@@ -67,7 +67,7 @@ async def with_optional_auth(
 
 
 async def has_entitlement(
-    database: StrictRedis, guild_id: str | int, entitlement: str
+    database: Redis, guild_id: str | int, entitlement: str
 ) -> bool:
     value = await database.hget(f"guild:{guild_id}:entitlements", entitlement)
     if value is None:
@@ -85,20 +85,18 @@ async def has_entitlement(
     return msgpack.unpackb(plan) >= value
 
 
-async def is_suspended(database: StrictRedis, guild_id: str | int) -> bool:
+async def is_suspended(database: Redis, guild_id: str | int) -> bool:
     return await get_entitlement(database, guild_id, "suspended")
 
 
-async def get_entitlement(
-    database: StrictRedis, guild_id: str | int, name: str
-) -> bool:
+async def get_entitlement(database: Redis, guild_id: str | int, name: str) -> bool:
     value = await database.hget(f"guild:{guild_id}:entitlements", name)
     if value is None:
         return GuildEntitlements.__fields__[name].default
     return getattr(GuildEntitlements(**{name: msgpack.unpackb(value)}), name)
 
 
-async def get_config(database: StrictRedis, guild_id: str | int, name: str):
+async def get_config(database: Redis, guild_id: str | int, name: str):
     value = await database.hget(f"guild:{guild_id}:config", name)
     if value is None:
         return GuildConfig.__fields__[name].default
@@ -109,7 +107,7 @@ get_guilds_lock: dict[str, asyncio.Event] = {}
 get_user_lock: dict[str, asyncio.Event] = {}
 
 
-async def get_guilds(database: StrictRedis, user_id: str):
+async def get_guilds(database: Redis, user_id: str):
     cached = await database.get(f"cache:user:{user_id}:guilds")
     if cached is not None:
         return msgpack.unpackb(cached)
@@ -156,7 +154,7 @@ async def get_guilds(database: StrictRedis, user_id: str):
     return guildobj
 
 
-async def get_userme(database: StrictRedis, user_id: str):
+async def get_userme(database: Redis, user_id: str):
     cached = await database.get(f"cache:user:{user_id}")
     if cached is not None:
         return msgpack.unpackb(cached)

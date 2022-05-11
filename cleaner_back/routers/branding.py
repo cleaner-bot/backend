@@ -5,7 +5,7 @@ from base64 import urlsafe_b64encode
 from datetime import datetime
 
 import msgpack  # type: ignore
-from coredis import StrictRedis
+from coredis import Redis
 from fastapi import APIRouter, Depends, HTTPException, Request
 
 from ..models import VanityResponse
@@ -40,7 +40,7 @@ def generate_upload_url(guild_id: str, category: str):
 async def post_branding_splash_asset_url(
     guild_id: str,
     user_id: str = Depends(with_auth),
-    database: StrictRedis = Depends(with_database),
+    database: Redis = Depends(with_database),
 ):
     await check_guild(user_id, guild_id, database)
     await verify_guild_access(guild_id, database, "branding_splash")
@@ -54,7 +54,7 @@ async def put_branding_vanity(
     guild_id: str,
     request: Request,
     user_id: str = Depends(with_auth),
-    database: StrictRedis = Depends(with_database),
+    database: Redis = Depends(with_database),
 ):
     await check_guild(user_id, guild_id, database)
     await verify_guild_access(guild_id, database, "branding_vanity")
@@ -81,7 +81,7 @@ async def put_branding_vanity(
 
 
 @router.get("/vanity/{vanity}", response_model=VanityResponse)
-async def get_vanity(vanity: str, database: StrictRedis = Depends(with_database)):
+async def get_vanity(vanity: str, database: Redis = Depends(with_database)):
     if not re.fullmatch(r"[a-z\d-]{2,32}", vanity):
         raise HTTPException(404, "Vanity not found")
     guild = await database.get(f"vanity:{vanity}")

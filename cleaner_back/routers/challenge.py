@@ -1,6 +1,6 @@
 import os
 
-from coredis import StrictRedis
+from coredis import Redis
 from fastapi import APIRouter, Depends, HTTPException
 
 from ..models import ChallengerRequest, ChallengerResponse
@@ -21,7 +21,7 @@ router = APIRouter()
 async def get_challenge(
     flow: str,
     auth_user_id: str = Depends(with_optional_auth),
-    database: StrictRedis = Depends(with_database),
+    database: Redis = Depends(with_database),
 ):
     if len(flow) != 64 or not all(x in "0123456789abcdef" for x in flow):
         raise HTTPException(400, "Invalid flow")
@@ -59,7 +59,7 @@ async def post_challenge(
     flow: str,
     body: ChallengerRequest | None = None,
     auth_user_id: str = Depends(with_auth),
-    database: StrictRedis = Depends(with_database),
+    database: Redis = Depends(with_database),
 ):
     if len(flow) != 64 or not all(x in "0123456789abcdef" for x in flow):
         raise HTTPException(400, "Invalid flow")

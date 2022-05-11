@@ -5,7 +5,7 @@ import msgpack  # type: ignore
 from async_commerce_coinbase import Coinbase, webhook
 from async_commerce_coinbase.resources.charge import Charge
 from async_stripe import stripe  # type: ignore
-from coredis import StrictRedis
+from coredis import Redis
 from fastapi import APIRouter, Depends, HTTPException, Request
 
 from ..shared import limiter, with_auth, with_database
@@ -24,7 +24,7 @@ async def get_stripe_checkout(
     guild_id: str,
     yearly: bool,
     user_id: str = Depends(with_auth),
-    database: StrictRedis = Depends(with_database),
+    database: Redis = Depends(with_database),
 ):
     await verify_guild_access(guild_id, database)
 
@@ -64,7 +64,7 @@ async def get_stripe_checkout(
 async def get_stripe_portal(
     guild_id: str = None,
     user_id: str = Depends(with_auth),
-    database: StrictRedis = Depends(with_database),
+    database: Redis = Depends(with_database),
 ):
     if guild_id is not None:
         customer_user, customer_platform = await database.hmget(
@@ -106,7 +106,7 @@ STRIPE_WEBHOOK_IPS = {
 
 @router.post("/billing/stripe/webhook", status_code=204)
 async def post_stripe_webhook(
-    request: Request, database: StrictRedis = Depends(with_database)
+    request: Request, database: Redis = Depends(with_database)
 ):
     ip = request.headers.get("cf-connecting-ip", None)
     if ip is None or ip not in STRIPE_WEBHOOK_IPS:
@@ -171,7 +171,7 @@ async def post_stripe_webhook(
 async def get_coinbase_checkout(
     guild_id: str,
     user_id: str = Depends(with_auth),
-    database: StrictRedis = Depends(with_database),
+    database: Redis = Depends(with_database),
 ):
     await verify_guild_access(guild_id, database)
 
@@ -195,7 +195,7 @@ async def get_coinbase_checkout(
 
 @router.post("/billing/coinbase/webhook", status_code=204)
 async def post_coinbase_webhook(
-    request: Request, database: StrictRedis = Depends(with_database)
+    request: Request, database: Redis = Depends(with_database)
 ):
     sig_header = request.headers.get("X-CC-Webhook-Signature", None)
     if sig_header is None:

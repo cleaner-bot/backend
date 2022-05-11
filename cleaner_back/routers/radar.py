@@ -1,5 +1,5 @@
 import msgpack  # type: ignore
-from coredis import StrictRedis
+from coredis import Redis
 from fastapi import APIRouter, Depends, HTTPException
 
 from ..models import RadarInfo
@@ -9,7 +9,7 @@ router = APIRouter()
 
 
 @router.get("/radar", response_model=RadarInfo)
-async def get_radar(database: StrictRedis = Depends(with_database)):
+async def get_radar(database: Redis = Depends(with_database)):
     data = await database.get("radar")
     if data is None:
         raise HTTPException(500, "No data available currently.")
