@@ -6,8 +6,7 @@ import msgpack  # type: ignore
 from coredis import Redis
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import RedirectResponse
-from hikari import BadRequestError, Permissions, UnauthorizedError
-from hikari.impl import RESTClientImpl
+from hikari import BadRequestError, Permissions, RESTApp, UnauthorizedError
 from hikari.urls import BASE_URL
 from jose import jws  # type: ignore
 
@@ -121,7 +120,7 @@ async def oauth_callback(
     code: str = None,
     state: str = None,
     database: Redis = Depends(with_database),
-    hikari: RESTClientImpl = Depends(with_hikari),
+    hikari: RESTApp = Depends(with_hikari),
 ):
     if state is None or state[0] == "1":
         redirect_target = "/dash"
@@ -156,12 +155,11 @@ async def oauth_callback(
     if client_secret is None or client_id is None:
         raise HTTPException(500, "Configuration issue, please contact support")
 
-    this_redirect_uri = redirect_uri
-
     try:
-        authtoken = await hikari.authorize_access_token(
-            int(client_id), client_secret, code, this_redirect_uri
-        )
+        async with hikari_rest.acquire() as clientbot:
+            authtoken = await clientbot.authorize_access_token(
+                int(client_id), client_secret, code, redirect_uri
+            )
     except BadRequestError:
         await database.delete((f"dash:oauth:state:{state}",))
         raise HTTPException(400, "Invalid code")

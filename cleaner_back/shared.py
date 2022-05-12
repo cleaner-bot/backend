@@ -27,10 +27,8 @@ def with_asyncclient() -> AsyncClient:
     return aclient
 
 
-async def with_hikari():
-    token = os.getenv("discord/bot-token")
-    async with hikari_rest.acquire(token, "Bot") as restimpl:
-        yield restimpl
+async def with_hikari() -> RESTApp:
+    return hikari_rest
 
 
 async def with_auth(

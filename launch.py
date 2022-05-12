@@ -10,7 +10,6 @@ load_dotenv(Path("~/.cleaner/env/backend").expanduser())
 def _load_secrets():
     fields = (
         "sentry/dsn",
-        "discord/bot-token",
         "discord/client-secret",
         "discord/client-id",
         "hcaptcha/secret",
