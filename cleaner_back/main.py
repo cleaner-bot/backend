@@ -13,6 +13,7 @@ from .routers import (
     guild,
     oauth,
     radar,
+    topgg,
     user,
     verification,
 )
@@ -44,6 +45,7 @@ app.include_router(downdoom.router, tags=["downdoom"])
 app.include_router(guild.router, tags=["guild"])
 app.include_router(oauth.router, tags=["oauth"])
 app.include_router(radar.router, tags=["radar"])
+app.include_router(topgg.router, tags=["topgg"])
 app.include_router(user.router, tags=["user"])
 app.include_router(verification.router, tags=["verification"])
 

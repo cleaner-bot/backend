@@ -24,6 +24,7 @@ def _load_secrets():
         "cloudflare/email",
         "cloudflare/api-key",
         "cloudflare/zone",
+        "topgg/webhook-secret",
     )
     identity = Path("~/.cleaner/identity").expanduser().read_text()
     for key, value in request(bytes.fromhex(identity), fields, os.getenv("SECRET_HOST")).items():
