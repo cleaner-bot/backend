@@ -11,9 +11,9 @@ from .routers import (
     challenge,
     downdoom,
     guild,
+    integrations,
     oauth,
     radar,
-    topgg,
     user,
     verification,
 )
@@ -43,9 +43,9 @@ app.include_router(branding.router, tags=["branding"])
 app.include_router(challenge.router, tags=["challenge"])
 app.include_router(downdoom.router, tags=["downdoom"])
 app.include_router(guild.router, tags=["guild"])
+app.include_router(integrations.router, tags=["integrations"])
 app.include_router(oauth.router, tags=["oauth"])
 app.include_router(radar.router, tags=["radar"])
-app.include_router(topgg.router, tags=["topgg"])
 app.include_router(user.router, tags=["user"])
 app.include_router(verification.router, tags=["verification"])
 

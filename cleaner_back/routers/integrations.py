@@ -9,7 +9,7 @@ from ..shared import with_database
 router = APIRouter()
 
 
-@router.post("/topgg/webhook", status_code=204)
+@router.post("/integrations/topgg/webhook", status_code=204)
 async def post_topgg_webhook(
     request: Request, database: Redis = Depends(with_database)
 ):
@@ -24,4 +24,4 @@ async def post_topgg_webhook(
 
     event = await request.json()
 
-    await database.publish("pubsub:topgg-vote", msgpack.packb(event))
+    await database.publish("pubsub:integrations:topgg-vote", msgpack.packb(event))
