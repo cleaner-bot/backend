@@ -25,7 +25,7 @@ def _load_secrets():
         "cloudflare/api-key",
         "cloudflare/zone",
     )
-    identity = Path("~/.cleaner/identity").read_text()
+    identity = Path("~/.cleaner/identity").expanduser().read_text()
     for key, value in request(identity, fields, os.getenv("SECRET_HOST")):
         os.environ[key] = value
 
