@@ -1,12 +1,18 @@
 import os
 
-from fastapi import APIRouter, HTTPException, Request
+import msgpack  # type: ignore
+from coredis import Redis
+from fastapi import APIRouter, Depends, HTTPException, Request
+
+from ..shared import with_database
 
 router = APIRouter()
 
 
 @router.post("/topgg/webhook", status_code=204)
-async def post_topgg_webhook(request: Request):
+async def post_topgg_webhook(
+    request: Request, database: Redis = Depends(with_database)
+):
     ip = request.headers.get("cf-connecting-ip", None)
     if ip != "159.203.105.187":
         raise HTTPException(400, "IP lookup failed.")
@@ -18,4 +24,4 @@ async def post_topgg_webhook(request: Request):
 
     event = await request.json()
 
-    print(event)
+    await database.publish("pubsub:topgg-vote", msgpack.packb(event))
