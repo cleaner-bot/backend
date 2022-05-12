@@ -28,7 +28,7 @@ def with_asyncclient() -> AsyncClient:
 
 
 async def with_hikari():
-    token = os.getenv("SECRET_BOT_TOKEN")
+    token = os.getenv("discord/bot-token")
     async with hikari_rest.acquire(token, "Bot") as restimpl:
         yield restimpl
 
@@ -39,7 +39,7 @@ async def with_auth(
     if x_token is None:
         raise HTTPException(401, "Missing X-Token header")
 
-    secret = os.getenv("SECRET_WEB_AUTH")
+    secret = os.getenv("backend/jwt-secret")
     try:
         data = jws.verify(x_token, secret, algorithms=["HS256"])
     except jws.JWSError:
@@ -198,10 +198,10 @@ limiter = Limiter(key_func=get_visitor_ip, global_limits=["10/s", "50/10s", "100
 
 reporter = None
 
-cf_email = os.getenv("SECRET_CF_EMAIL")
-cf_key = os.getenv("SECRET_CF_KEY")
+cf_email = os.getenv("cloudflare/email")
+cf_key = os.getenv("cloudflare/api-key")
 if cf_email is not None and cf_key is not None:
-    zone = os.getenv("CF_ZONE")
+    zone = os.getenv("cloudflare/zone")
     reporter = CloudflareIPAccessRuleReporter(
         cf_email,
         cf_key,

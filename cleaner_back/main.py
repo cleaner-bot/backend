@@ -50,7 +50,7 @@ app.include_router(verification.router, tags=["verification"])
 app.state.limiter = limiter
 
 
-sentry_dsn = os.getenv("SECRET_SENTRY_DSN")
+sentry_dsn = os.getenv("sentry/dsn")
 if sentry_dsn is not None:
     import sentry_sdk
     from sentry_sdk.integrations.asgi import SentryAsgiMiddleware

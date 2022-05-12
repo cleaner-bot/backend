@@ -1,6 +1,6 @@
 
 # Cleaner API backend
 
-dev: `uvicorn cleaner_back:app --port 3001 --reload`
+dev: `uvicorn launch:app --port 3001 --reload`
 
-prod: `uvicorn cleaner_back:app --port 4000`
+prod: `uvicorn launch:app --port 4000`

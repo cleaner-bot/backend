@@ -22,7 +22,7 @@ router = APIRouter()
 
 
 def generate_upload_url(guild_id: str, category: str):
-    key = os.getenv("SECRET_CDN_UPLOAD")
+    key = os.getenv("backend/cdn-secret")
     if key is None:
         raise HTTPException(500, "Configuration issue, please contact support")
 

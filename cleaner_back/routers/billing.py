@@ -12,9 +12,10 @@ from ..shared import limiter, with_auth, with_database
 from .guild import verify_guild_access
 
 router = APIRouter()
-stripe.api_key = os.getenv("SECRET_STRIPE_TOKEN")
-coinbase_api_key = os.getenv("SECRET_COINBASE_API")
+stripe.api_key = os.getenv("stripe/api-token")
+coinbase_api_key = os.getenv("coinbase/api-token")
 coinbase = Coinbase(coinbase_api_key) if coinbase_api_key else None
+del coinbase_api_key
 URL_ROOT = "https://cleanerbot.xyz"
 
 
@@ -120,7 +121,7 @@ async def post_stripe_webhook(
 
     try:
         event = stripe.Webhook.construct_event(
-            payload, sig_header, os.getenv("SECRET_STRIPE_WEBHOOK")
+            payload, sig_header, os.getenv("stripe/webhook-secret")
         )
     except ValueError:
         raise HTTPException(400, "Invalid payload")
@@ -202,7 +203,7 @@ async def post_coinbase_webhook(
         raise HTTPException(400, "Missing signature")
 
     payload = await request.body()
-    webhook_secret = os.getenv("SECRET_COINBASE_WEBHOOK")
+    webhook_secret = os.getenv("coinbase/webhook-secret")
     if webhook_secret is None:
         raise HTTPException(500, "Configuration issue. Contact support")
 

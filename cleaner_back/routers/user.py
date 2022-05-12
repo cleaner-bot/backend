@@ -76,7 +76,7 @@ async def remote_auth(auth: RemoteAuth, database: Redis = Depends(with_database)
         f"user:{user_id.decode()}:dash:session:{session.hex()}", 1, ex=expires_after
     )
 
-    secret = os.getenv("SECRET_WEB_AUTH")
+    secret = os.getenv("backend/jwt-secret")
     token = jws.sign(data.encode(), secret, algorithm="HS256")
 
     return {"token": token}

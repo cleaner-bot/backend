@@ -74,7 +74,7 @@ async def oauth_redirect(
             raise HTTPException(400, "Invalid component")
         state = f"4{guild}.{allowed_components.index(component)}"
 
-    client_id = os.getenv("CLIENT_ID")
+    client_id = os.getenv("discord/client-id")
     if client_id is None:
         raise HTTPException(500, "Configuration issue, please contact support")
 
@@ -151,8 +151,8 @@ async def oauth_callback(
     if code is None:
         return {"redirect": redirect_target}
 
-    client_secret = os.getenv("SECRET_CLIENT")
-    client_id = os.getenv("CLIENT_ID")
+    client_secret = os.getenv("discord/client-secret")
+    client_id = os.getenv("discord/client-id")
     if client_secret is None or client_id is None:
         raise HTTPException(500, "Configuration issue, please contact support")
 
@@ -198,7 +198,7 @@ async def oauth_callback(
     }
     await database.set(f"cache:user:{auth.user.id}", msgpack.packb(userobj), ex=30)
 
-    secret = os.getenv("SECRET_WEB_AUTH")
+    secret = os.getenv("backend/jwt-secret")
     token = jws.sign(data.encode(), secret, algorithm="HS256")
 
     if redirect_target == "/dash" and authtoken.guild is not None:
