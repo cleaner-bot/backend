@@ -4,13 +4,14 @@ from datetime import datetime
 
 import msgpack  # type: ignore
 from cleaner_conf.guild import GuildConfig, GuildEntitlements
-from cleaner_ratelimit import Limiter, get_visitor_ip
-from cleaner_ratelimit.jail import CloudflareIPAccessRuleReporter, Jail
 from coredis import Redis
 from fastapi import Depends, Header, HTTPException
 from hikari import Permissions, RESTApp, UnauthorizedError
 from httpx import AsyncClient
 from jose import jws  # type: ignore
+from slowerapi import IPJail, Limiter, get_visitor_ip
+from slowerapi.jail import ReportFunc
+from slowerapi.reporters.cf import CloudflareIPAccessRuleReporter
 
 home = "https://cleanerbot.xyz"
 redis_db = os.getenv("REDIS_URL")
@@ -192,19 +193,19 @@ async def get_userme(database: Redis, user_id: str):
     return userobj
 
 
-limiter = Limiter(key_func=get_visitor_ip, global_limits=["10/s", "50/10s", "100/m"])
+limiter = Limiter(key_func=get_visitor_ip, global_limits=("10/s", "50/10s", "100/m"))
 
-reporter = None
+reporters: list[ReportFunc] = []
 
 cf_email = os.getenv("cloudflare/email")
 cf_key = os.getenv("cloudflare/api-key")
 if cf_email is not None and cf_key is not None:
     zone = os.getenv("cloudflare/zone")
-    reporter = CloudflareIPAccessRuleReporter(
+    reporters.append(CloudflareIPAccessRuleReporter(
         cf_email,
         cf_key,
         zone,
         "Banned for exceeding ratelimits on api.cleanerbot.xyz",
-    )
+    ))
 
-limiter.jail = Jail(get_visitor_ip, "50/5m", reporter)
+limiter.jail = IPJail(get_visitor_ip, ("50/5m",), reporters)

@@ -1,8 +1,8 @@
 import os
 
-from cleaner_ratelimit import RatelimitMiddleware
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from slowerapi import RatelimitMiddleware
 
 from .middleware import DBConnectErrorMiddleware
 from .routers import (
