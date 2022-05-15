@@ -201,11 +201,13 @@ cf_email = os.getenv("cloudflare/email")
 cf_key = os.getenv("cloudflare/api-key")
 if cf_email is not None and cf_key is not None:
     zone = os.getenv("cloudflare/zone")
-    reporters.append(CloudflareIPAccessRuleReporter(
-        cf_email,
-        cf_key,
-        zone,
-        "Banned for exceeding ratelimits on api.cleanerbot.xyz",
-    ))
+    reporters.append(
+        CloudflareIPAccessRuleReporter(
+            cf_email,
+            cf_key,
+            zone,
+            "Banned for exceeding ratelimits on api.cleanerbot.xyz",
+        )
+    )
 
 limiter.jail = IPJail(get_visitor_ip, ("50/5m",), reporters)
