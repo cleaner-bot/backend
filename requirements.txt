@@ -13,4 +13,4 @@ downdoom@git+https://github.com/cleaner-bot/downdoom.git
 async_commerce_coinbase@git+https://github.com/cleaner-bot/async-commerce-coinbase.git
 secretclient@git+ssh://git@github.com/cleaner-bot/secret-client
 cleaner_conf@git+ssh://git@github.com/cleaner-bot/cleaner-config
-cleaner_ratelimit@git+ssh://git@github.com/cleaner-bot/cleaner-ratelimit
+slowerapi@git+ssh://git@github.com/cleaner-bot/slowerapi
