@@ -254,7 +254,7 @@ async def post_guild_snaphost(
     snapshot_id = os.urandom(16).hex()
 
     pubsub = database.pubsub()
-    await pubsub.subscribe("pubsub:backup:snapshot:{snapshot_id}")
+    await pubsub.subscribe(f"pubsub:backup:snapshot:{snapshot_id}")
 
     await database.publish("pubsub:backup:snapshot", f"{guild_id}:{snapshot_id}")
 
