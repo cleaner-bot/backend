@@ -278,6 +278,11 @@ async def post_apply_guild_snaphost(
     await check_guild(user_id, guild_id, database)
     await verify_guild_access(guild_id, database, "backup")
 
+    if len(snapshot_id) != 32 or any(x not in "0123456789abcdef" for x in snapshot_id):
+        raise HTTPException(400, "Invalid snapshot id")
+    elif not await database.hexists(f"guild:{guild_id}:backup:snapshots", snapshot_id):
+        raise HTTPException(404, "Snapshot not found")
+
     await database.publish("pubsub:backup:apply-snapshot", f"{guild_id}:{snapshot_id}")
 
 
