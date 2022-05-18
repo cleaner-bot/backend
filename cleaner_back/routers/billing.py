@@ -156,7 +156,7 @@ async def post_stripe_webhook(
         subscription = event["data"]["object"]
 
         guild_id = subscription["metadata"]["guild"]
-        operation = {"plan": msgpack.packb(1)}
+        operation = {"plan": msgpack.packb(0)}
         await database.hset(f"guild:{guild_id}:entitlements", operation)  # type: ignore
         payload = {"guild_id": int(guild_id), "entitlements": operation}  # type: ignore
         await database.publish("pubsub:settings-update", msgpack.packb(payload))
