@@ -10,7 +10,7 @@ from hikari import BadRequestError, Permissions, RESTApp, UnauthorizedError
 from hikari.urls import BASE_URL
 from jose import jws  # type: ignore
 
-from ..shared import hikari_rest, limiter, with_database, with_hikari
+from ..shared import limiter, with_database, with_hikari
 
 router = APIRouter()
 
@@ -156,7 +156,7 @@ async def oauth_callback(
         raise HTTPException(500, "Configuration issue, please contact support")
 
     try:
-        async with hikari_rest.acquire() as clientbot:
+        async with hikari.acquire() as clientbot:
             authtoken = await clientbot.authorize_access_token(
                 int(client_id), client_secret, code, redirect_uri
             )
@@ -165,7 +165,7 @@ async def oauth_callback(
         raise HTTPException(400, "Invalid code")
 
     try:
-        async with hikari_rest.acquire(authtoken.access_token, "Bearer") as selfbot:
+        async with hikari.acquire(authtoken.access_token, "Bearer") as selfbot:
             auth = await selfbot.fetch_authorization()
 
     except UnauthorizedError:
