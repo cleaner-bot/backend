@@ -251,6 +251,10 @@ async def post_guild_snaphost(
     await check_guild(user_id, guild_id, database)
     await verify_guild_access(guild_id, database, "backup")
 
+    limit = await get_entitlement(database, guild_id, "backup_snapshot_limit")
+    if await database.hlen(f"pubsub:backup:snapshot:{snapshot_id}") >= limit:
+        raise HTTPException(403, "Snapshot limit reached")
+
     snapshot_id = os.urandom(16).hex()
 
     pubsub = database.pubsub()
