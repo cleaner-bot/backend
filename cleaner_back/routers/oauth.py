@@ -161,7 +161,6 @@ async def oauth_callback(
                 int(client_id), client_secret, code, redirect_uri
             )
     except BadRequestError:
-        await database.delete((f"dash:oauth:state:{state}",))
         raise HTTPException(400, "Invalid code")
 
     try:
@@ -172,7 +171,6 @@ async def oauth_callback(
         raise HTTPException(401, "Very fast deauthorization you got there")
 
     if set(scopes) != set(auth.scopes) or auth.user is None:
-        await database.delete((f"dash:oauth:state:{state}",))
         raise HTTPException(400, "Scope mismatch")
 
     expires_after = 60 * 60 * 24 * 7
