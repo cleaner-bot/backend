@@ -183,7 +183,7 @@ async def get_coinbase_checkout(
 
     charge = await coinbase.create_charge(
         name="The Cleaner Pro",
-        description=f"The Cleaner Pro Yearly (30€) for guild {guild_id}",
+        description=f"The Cleaner Pro Yearly (40€) for guild {guild_id}",
         pricing_type="fixed_price",
         local_price={"amount": 30, "currency": "EUR"},
         redirect_url=f"{URL_ROOT}/billing/coinbase/success?guild={guild_id}",
