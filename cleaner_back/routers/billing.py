@@ -143,10 +143,11 @@ async def post_stripe_webhook(
 
         guild_id = subscription["metadata"]["guild"]
         user_id = subscription["metadata"]["user"]
-        operation = {"plan": msgpack.packb(1)}
-        await database.hset(f"guild:{guild_id}:entitlements", operation)  # type: ignore
-        payload = {"guild_id": int(guild_id), "entitlements": operation}  # type: ignore
-        await database.publish("pubsub:settings-update", msgpack.packb(payload))
+        await database.hset(
+            f"guild:{guild_id}:entitlements", {"plan": msgpack.packb(1)}
+        )
+        pubpayload = {"guild_id": int(guild_id), "entitlements": {"plan": 1}}
+        await database.publish("pubsub:settings-update", msgpack.packb(pubpayload))
 
         await database.hset(
             f"guild:{guild_id}:subscription", {"user": user_id, "platform": "stripe"}
@@ -156,10 +157,11 @@ async def post_stripe_webhook(
         subscription = event["data"]["object"]
 
         guild_id = subscription["metadata"]["guild"]
-        operation = {"plan": msgpack.packb(0)}
-        await database.hset(f"guild:{guild_id}:entitlements", operation)  # type: ignore
-        payload = {"guild_id": int(guild_id), "entitlements": operation}  # type: ignore
-        await database.publish("pubsub:settings-update", msgpack.packb(payload))
+        await database.hset(
+            f"guild:{guild_id}:entitlements", {"plan": msgpack.packb(0)}
+        )
+        pubpayload = {"guild_id": int(guild_id), "entitlements": {"plan": 0}}
+        await database.publish("pubsub:settings-update", msgpack.packb(pubpayload))
 
         await database.delete((f"guild:{guild_id}:subscription",))
 
@@ -218,10 +220,11 @@ async def post_coinbase_webhook(
         data: Charge = event["data"]  # type: ignore
         guild_id = data["metadata"]["guild"]
         user_id = data["metadata"]["user"]
-        operation = {"plan": msgpack.packb(1)}
-        await database.hset(f"guild:{guild_id}:entitlements", operation)  # type: ignore
-        payload = {"guild_id": int(guild_id), "entitlements": operation}  # type: ignore
-        await database.publish("pubsub:settings-update", msgpack.packb(payload))
+        await database.hset(
+            f"guild:{guild_id}:entitlements", {"plan": msgpack.packb(1)}
+        )
+        pubpayload = {"guild_id": int(guild_id), "entitlements": {"plan": 1}}
+        await database.publish("pubsub:settings-update", msgpack.packb(pubpayload))
 
         await database.hset(
             f"guild:{guild_id}:subscription",
