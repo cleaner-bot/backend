@@ -26,7 +26,7 @@ router = APIRouter()
 async def check_guild(user_id: str, guild_id: str, database: Redis):
     guilds = await get_guilds(database, user_id)
     for guild in guilds:
-        if guild["id"] == guild_id and guild["access"] >= 0:
+        if guild["id"] == guild_id and guild["access_type"] >= 0:
             return guild
 
     if has_access(user_id) and await database.hexists(
@@ -36,7 +36,7 @@ async def check_guild(user_id: str, guild_id: str, database: Redis):
             "id": guild_id,
             "name": "Placeholder",
             "icon": None,
-            "access": 0,
+            "access_type": 0,
         }
 
     raise HTTPException(404, "Guild not found")
