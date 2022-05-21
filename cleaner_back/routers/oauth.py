@@ -36,6 +36,7 @@ allowed_components = (
     "backup",
     "bot",
     "branding",
+    "access",
     "plan",
     "contact",
     "dev",
