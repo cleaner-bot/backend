@@ -6,7 +6,7 @@ from fastapi import APIRouter
 
 router = APIRouter()
 
-host = os.getenv("DOWNDOOM_HOST")
+host = os.getenv("downdoom/host")
 client = None if host is None else Client("backend", host)
 downdoom_task = None
 

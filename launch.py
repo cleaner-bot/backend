@@ -27,7 +27,7 @@ def _load_secrets():
     )
     identity = Path("~/.cleaner/identity").expanduser().read_text()
     for key, value in request(
-        bytes.fromhex(identity), fields, os.getenv("SECRET_HOST")
+        bytes.fromhex(identity), fields, os.getenv("secret/host")
     ).items():
         os.environ[key] = value
 
