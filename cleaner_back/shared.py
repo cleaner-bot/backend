@@ -15,8 +15,9 @@ from slowerapi.jail import ReportFunc
 from slowerapi.reporters.cf import CloudflareIPAccessRuleReporter
 
 home = "https://cleanerbot.xyz"
-redis_db = os.getenv("REDIS_URL")
-redis = Redis.from_url(redis_db) if redis_db is not None else Redis()
+redis_host = os.getenv("redis/host", "localhost")
+redis_passwd = os.getenv("redis/password")
+redis = Redis.from_url(f"redis://{redis_passwd}:{redis_host}:6379")
 aclient = AsyncClient(headers={"user-agent": "CleanerBot (cleanerbot.xyz 0.1.0)"})
 hikari_rest = RESTApp()
 

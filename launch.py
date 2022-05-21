@@ -12,6 +12,7 @@ def _load_secrets():
         "sentry/dsn",
         "discord/client-secret",
         "discord/client-id",
+        "redis/password",
         "hcaptcha/secret",
         "hcaptcha/sitekey",
         "backend/jwt-secret",
