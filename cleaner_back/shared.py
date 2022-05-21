@@ -2,6 +2,7 @@ import asyncio
 import os
 from datetime import datetime
 
+import hikari
 import msgpack  # type: ignore
 from cleaner_conf.guild import GuildConfig, GuildEntitlements
 from coredis import Redis
@@ -135,22 +136,37 @@ async def get_guilds(database: Redis, user_id: str):
         get_guilds_lock[user_id].set()
         del get_guilds_lock[user_id]
 
-    required_permissions = Permissions.ADMINISTRATOR | Permissions.MANAGE_GUILD
     guildobj = [
         {
             "id": str(guild.id),
             "name": guild.name,
             "icon": guild.icon_hash,
-            "is_owner": guild.is_owner,
-            "is_admin": guild.my_permissions & Permissions.ADMINISTRATOR > 0,
+            "access_type": await get_access_type(database, guild, user_id),
         }
         for guild in guilds
-        if guild.my_permissions & required_permissions
     ]
 
     await database.set(f"cache:user:{user_id}:guilds", msgpack.packb(guildobj), ex=30)
 
     return guildobj
+
+
+async def get_access_type(database: Redis, guild: hikari.OwnGuild, user_id: str):
+    if guild.is_owner:
+        return 0
+    permissions = await get_config(database, guild.id, "access_permissions")
+    if permissions and guild.my_permissions & Permissions.ADMINISTRATOR:
+        return 1
+    elif permissions == 2 and guild.my_permissions & Permissions.MANAGE_GUILD:
+        return 2
+
+    # TODO: roles
+
+    members = await get_config(database, guild.id, "access_members")
+    if user_id in members:
+        return 4
+
+    return -1
 
 
 async def get_userme(database: Redis, user_id: str):

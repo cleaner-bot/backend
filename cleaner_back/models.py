@@ -27,8 +27,7 @@ class GuildInfo(BaseModel):
     id: str
     name: str
     icon: str | None
-    is_owner: bool
-    is_admin: bool
+    access_type: int
     is_added: bool
     is_suspended: bool
 
