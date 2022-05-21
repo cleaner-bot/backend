@@ -163,7 +163,7 @@ async def get_access_type(database: Redis, guild: hikari.OwnGuild, user_id: str)
     # TODO: roles
 
     members = await get_config(database, guild.id, "access_members")
-    if user_id in members:
+    if members is not None and user_id in members:
         return 4
 
     return -1
