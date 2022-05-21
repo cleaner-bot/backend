@@ -36,7 +36,7 @@ async def user_me_delete_sessions(
 async def user_me_guilds(
     user_id: str = Depends(with_auth), database: Redis = Depends(with_database)
 ):
-    guilds = [x for x in await get_guilds(database, user_id) if x["access"] >= 0]
+    guilds = [x for x in await get_guilds(database, user_id) if x["access_type"] >= 0]
     for guild in guilds:
         guild_id = guild["id"]
         guild["is_added"] = await database.hexists(f"guild:{guild_id}:sync", "added")
