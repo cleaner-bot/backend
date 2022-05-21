@@ -213,16 +213,14 @@ limiter = Limiter(key_func=get_visitor_ip, global_limits=("10/s", "50/10s", "100
 
 reporters: list[ReportFunc] = []
 
-cf_email = os.getenv("cloudflare/email")
-cf_key = os.getenv("cloudflare/api-key")
-if cf_email is not None and cf_key is not None:
+cf_token = os.getenv("cloudflare/api-token")
+if cf_token is not None:
     zone = os.getenv("cloudflare/zone")
     reporters.append(
         CloudflareIPAccessRuleReporter(
-            cf_email,
-            cf_key,
-            zone,
-            "Banned for exceeding ratelimits on api.cleanerbot.xyz",
+            cf_token,
+            zone_id=zone,
+            note="Banned for exceeding ratelimits on api.cleanerbot.xyz",
         )
     )
 

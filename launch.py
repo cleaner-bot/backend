@@ -20,8 +20,7 @@ def _load_secrets():
         "stripe/webhook-secret",
         "coinbase/api-token",
         "coinbase/webhook-secret",
-        "cloudflare/email",
-        "cloudflare/api-key",
+        "cloudflare/api-token",
         "cloudflare/zone",
         "topgg/webhook-secret",
     )
