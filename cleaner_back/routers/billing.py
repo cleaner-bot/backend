@@ -106,6 +106,7 @@ STRIPE_WEBHOOK_IPS = {
 
 
 @router.post("/billing/stripe/webhook", status_code=204)
+@limiter.only_count_failed
 async def post_stripe_webhook(
     request: Request, database: Redis = Depends(with_database)
 ):
@@ -197,6 +198,7 @@ async def get_coinbase_checkout(
 
 
 @router.post("/billing/coinbase/webhook", status_code=204)
+@limiter.only_count_failed
 async def post_coinbase_webhook(
     request: Request, database: Redis = Depends(with_database)
 ):

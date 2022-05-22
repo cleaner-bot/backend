@@ -4,12 +4,13 @@ import msgpack  # type: ignore
 from coredis import Redis
 from fastapi import APIRouter, Depends, HTTPException, Request
 
-from ..shared import with_database
+from ..shared import limiter, with_database
 
 router = APIRouter()
 
 
 @router.post("/integrations/topgg/webhook", status_code=204)
+@limiter.only_count_failed
 async def post_topgg_webhook(
     request: Request, database: Redis = Depends(with_database)
 ):
