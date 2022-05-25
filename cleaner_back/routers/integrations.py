@@ -33,10 +33,6 @@ async def post_topgg_webhook(
 async def post_dlist_webhook(
     request: Request, database: Redis = Depends(with_database)
 ):
-    ip = request.headers.get("cf-connecting-ip", None)
-    if ip != "159.203.105.187":
-        raise HTTPException(400, "IP lookup failed.")
-
     auth_header = request.headers.get("authorization", None)
     expected = os.getenv("dlistgg/webhook-secret")
     if auth_header != expected:
