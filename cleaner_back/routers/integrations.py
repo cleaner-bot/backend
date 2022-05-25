@@ -4,7 +4,7 @@ import msgpack  # type: ignore
 from coredis import Redis
 from fastapi import APIRouter, Depends, HTTPException, Request
 
-from ..shared import limiter, with_database
+from ..shared import limiter, print_request, with_database
 
 router = APIRouter()
 
@@ -38,6 +38,5 @@ async def post_dlist_webhook(
     if auth_header != expected:
         raise HTTPException(400, "Missing or invalid authorization")
 
-    event = await request.json()
-
-    print(event)
+    # event = await request.json()
+    await print_request(request)

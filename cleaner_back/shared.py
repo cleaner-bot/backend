@@ -6,7 +6,7 @@ import hikari
 import msgpack  # type: ignore
 from cleaner_conf.guild import GuildConfig, GuildEntitlements
 from coredis import Redis
-from fastapi import Depends, Header, HTTPException
+from fastapi import Depends, Header, HTTPException, Request
 from hikari import Permissions, RESTApp, UnauthorizedError
 from httpx import AsyncClient
 from jose import jws  # type: ignore
@@ -208,6 +208,16 @@ async def get_userme(database: Redis, user_id: str):
     await database.set(f"cache:user:{user_id}", msgpack.packb(userobj), ex=30)
 
     return userobj
+
+
+async def print_request(request: Request):
+    print(request.method, str(request.url))
+    for header, value in request.headers.items():
+        print(f"{header}: {value}")
+    print()
+    body = await request.body()
+    print(body)
+    return body
 
 
 limiter = Limiter(key_func=get_visitor_ip, global_limits=("10/s", "50/10s", "100/m"))
