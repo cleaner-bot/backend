@@ -28,7 +28,7 @@ async def post_topgg_webhook(
     await database.publish("pubsub:integrations:topgg-vote", msgpack.packb(event))
 
 
-@router.post("/integrations/dlist/webhook", status_code=204)
+@router.post("/integrations/dlistgg/webhook", status_code=204)
 @limiter.only_count_failed
 async def post_dlist_webhook(
     request: Request, database: Redis = Depends(with_database)
