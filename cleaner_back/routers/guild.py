@@ -240,7 +240,7 @@ async def get_guild_snapshots(
 
 
 @router.post("/guild/{guild_id}/backup/snapshot", status_code=204)
-@limiter.limit("3/1h")
+@limiter.limit("3/m", "20/h")
 async def post_guild_snaphost(
     guild_id: str,
     user_id: str = Depends(with_auth),
