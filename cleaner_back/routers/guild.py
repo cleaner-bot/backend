@@ -270,7 +270,7 @@ async def post_guild_snaphost(
 
 
 @router.post("/guild/{guild_id}/backup/snapshot/{snapshot_id}")
-@limiter.limit("3/1h")
+@limiter.limit("3/m", "20/h")
 async def post_apply_guild_snaphost(
     guild_id: str,
     snapshot_id: str,
