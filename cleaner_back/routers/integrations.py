@@ -36,10 +36,10 @@ async def post_dlist_webhook(
     database: Redis = Depends(with_database),
     authorization: str = Header(None),
 ):
+    await print_request(request)
     if authorization is None:
         raise HTTPException(400, "Missing signature")
     secret = os.getenv("dlistgg/webhook-secret")
-    await print_request(request)
     try:
         jws.verify(authorization, secret, algorithms=["HS256"])
     except jws.JWSError:
