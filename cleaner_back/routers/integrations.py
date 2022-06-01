@@ -34,15 +34,12 @@ async def post_topgg_webhook(
 async def post_dlist_webhook(
     request: Request,
     database: Redis = Depends(with_database),
-    authorization: str = Header(None),
 ):
-    await print_request(request)
-    if authorization is None:
-        raise HTTPException(400, "Missing signature")
+    body = (await print_request(request)).decode()
     secret = os.getenv("dlistgg/webhook-secret")
     try:
-        jws.verify(authorization, secret, algorithms=["HS256"])
+        event = jws.verify(body, secret, algorithms=["HS256"])
     except jws.JWSError:
         raise HTTPException(400, "Invalid signature")
 
-    # event = await request.json()
+    print(event)
