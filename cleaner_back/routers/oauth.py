@@ -6,7 +6,7 @@ import msgpack  # type: ignore
 from coredis import Redis
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import RedirectResponse
-from hikari import BadRequestError, Permissions, RESTApp, UnauthorizedError
+from hikari import BadRequestError, OAuth2Scope, Permissions, RESTApp, UnauthorizedError
 from hikari.urls import BASE_URL
 from jose import jws  # type: ignore
 
@@ -18,7 +18,7 @@ router = APIRouter()
 base = "/oauth2/authorize"
 redirect_uri = "https://cleanerbot.xyz/oauth-comeback"
 response_type = "code"
-scopes = ["identify", "guilds", "email"]
+scopes = [OAuth2Scope.IDENTIFY, OAuth2Scope.GUILDS]
 
 allowed_components = (
     "",
