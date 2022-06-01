@@ -2,7 +2,8 @@ import os
 
 import msgpack  # type: ignore
 from coredis import Redis
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
+from jose import jws  # type: ignore
 
 from ..shared import limiter, print_request, with_database
 
@@ -31,12 +32,17 @@ async def post_topgg_webhook(
 @router.post("/integrations/dlistgg/webhook", status_code=204)
 @limiter.only_count_failed
 async def post_dlist_webhook(
-    request: Request, database: Redis = Depends(with_database)
+    request: Request,
+    database: Redis = Depends(with_database),
+    authorization: str = Header(None),
 ):
-    auth_header = request.headers.get("authorization", None)
-    expected = os.getenv("dlistgg/webhook-secret")
-    if auth_header != expected:
-        raise HTTPException(400, "Missing or invalid authorization")
+    if authorization is None:
+        raise HTTPException(400, "Missing signature")
+    secret = os.getenv("dlistgg/webhook-secret")
+    await print_request(request)
+    try:
+        jws.verify(authorization, secret, algorithms=["HS256"])
+    except jws.JWSError:
+        raise HTTPException(400, "Invalid signature")
 
     # event = await request.json()
-    await print_request(request)
