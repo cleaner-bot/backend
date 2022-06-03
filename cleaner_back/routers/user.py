@@ -5,15 +5,15 @@ from coredis import Redis
 from fastapi import APIRouter, Depends, HTTPException
 from jose import jws  # type: ignore
 
-from ..schemas.models import GuildInfo, RemoteAuth, UserInfo, RemoteAuthResponse
-from ..schemas.types import TGuildInfo, TUserInfo, TRemoteAuthResponse
+from ..schemas.models import GuildInfo, RemoteAuth, RemoteAuthResponse, UserInfo
+from ..schemas.types import TGuildInfo, TRemoteAuthResponse, TUserInfo
 from ..shared import (
+    get_guilds,
     get_userme,
     is_suspended,
     limiter,
     with_auth,
     with_database,
-    get_guilds,
 )
 
 router = APIRouter()

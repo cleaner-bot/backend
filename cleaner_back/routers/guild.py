@@ -8,12 +8,12 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import ValidationError
 
 from ..access import Access, has_access
-from ..schemas.models import ChannelId, DetailedGuildInfo, StatisticsInfo, GuildSnapshot
+from ..schemas.models import ChannelId, DetailedGuildInfo, GuildSnapshot, StatisticsInfo
 from ..schemas.types import (
-    TGIUser,
-    TPartialGuildInfo,
     TDetailedGuildInfo,
+    TGIUser,
     TGuildSnapshot,
+    TPartialGuildInfo,
     TStatisticsInfo,
 )
 from ..shared import (
