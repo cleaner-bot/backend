@@ -103,7 +103,9 @@ async def get_entitlement(
     value = await database.hget(f"guild:{guild_id}:entitlements", name)
     if value is None:
         return GuildEntitlements.__fields__[name].default  # type: ignore
-    return getattr(GuildEntitlements(**{name: msgpack.unpackb(value)}), name)  # type: ignore
+    return getattr(  # type: ignore
+        GuildEntitlements(**{name: msgpack.unpackb(value)}), name
+    )
 
 
 async def get_config(

@@ -2,7 +2,7 @@ import os
 
 import msgpack  # type: ignore
 from coredis import Redis
-from fastapi import APIRouter, Depends, Header, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from jose import jws  # type: ignore
 
 from ..shared import limiter, print_request, with_database

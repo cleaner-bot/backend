@@ -44,7 +44,11 @@ async def user_me_guilds(
     user_id: str = Depends(with_auth), database: Redis[bytes] = Depends(with_database)
 ) -> list[TGuildInfo]:
     guilds: list[TGuildInfo]
-    guilds = [x for x in await get_guilds(database, user_id) if x["access_type"] >= 0]  # type: ignore
+    guilds = [
+        x  # type: ignore
+        for x in await get_guilds(database, user_id)
+        if x["access_type"] >= 0
+    ]
     for guild in guilds:
         guild_id = guild["id"]
         guild["is_added"] = await database.hexists(f"guild:{guild_id}:sync", "added")
