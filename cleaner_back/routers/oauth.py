@@ -171,6 +171,7 @@ async def oauth_callback(
     except UnauthorizedError:
         raise HTTPException(401, "Very fast deauthorization you got there")
 
+    print(set(scopes), set(auth.scopes), auth.user)
     if set(scopes) != set(auth.scopes) or auth.user is None:
         raise HTTPException(400, "Scope mismatch")
 
