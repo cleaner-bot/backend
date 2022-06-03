@@ -7,7 +7,7 @@ from secretclient import request
 load_dotenv(Path("~/.cleaner/env/backend").expanduser())
 
 
-def _load_secrets():
+def _load_secrets() -> None:
     fields = (
         "sentry/dsn",
         "discord/client-secret",
@@ -27,9 +27,10 @@ def _load_secrets():
         "dlistgg/webhook-secret",
     )
     identity = Path("~/.cleaner/identity").expanduser().read_text()
-    for key, value in request(
-        bytes.fromhex(identity), fields, os.getenv("secret/host")
-    ).items():
+    host = os.getenv("secret/host")
+    if host is None:
+        raise RuntimeError("secret/host env variable is unset")
+    for key, value in request(bytes.fromhex(identity), fields, host).items():
         os.environ[key] = value
 
 

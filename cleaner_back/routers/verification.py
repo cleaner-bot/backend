@@ -4,7 +4,8 @@ import msgpack  # type: ignore
 from coredis import Redis
 from fastapi import APIRouter, Depends, HTTPException
 
-from ..models import ChallengerRequest, ChallengerResponse
+from ..schemas.models import ChallengerRequest, ChallengerResponse
+from ..schemas.types import TChallengerResponse
 from ..shared import (
     aclient,
     get_config,
@@ -21,8 +22,8 @@ router = APIRouter()
 async def get_verification(
     guild: int,
     user_id: str = Depends(with_auth),
-    database: Redis = Depends(with_database),
-):
+    database: Redis[bytes] = Depends(with_database),
+) -> TChallengerResponse:
     if not await database.hexists(f"guild:{guild}:sync", "added"):
         raise HTTPException(404, "Guild not found")
     elif not await get_config(database, guild, "verification_enabled"):
@@ -41,7 +42,8 @@ async def get_verification(
         "user": user,
         "is_valid": await database.exists(
             (f"guild:{guild}:user:{user_id}:verification",)
-        ),
+        )
+        > 0,
         "captcha_required": False,  # TODO: captcha logic
         "splash": splash,
     }
@@ -52,8 +54,8 @@ async def post_verification(
     guild: int,
     body: ChallengerRequest,
     user_id: str = Depends(with_auth),
-    database: Redis = Depends(with_database),
-):
+    database: Redis[bytes] = Depends(with_database),
+) -> None:
     if not await database.hexists(f"guild:{guild}:sync", "added"):
         raise HTTPException(404, "Guild not found")
     elif not await get_config(database, guild, "verification_enabled"):

@@ -3,7 +3,8 @@ import os
 from coredis import Redis
 from fastapi import APIRouter, Depends, HTTPException
 
-from ..models import ChallengerRequest, ChallengerResponse
+from ..schemas.models import ChallengerRequest, ChallengerResponse
+from ..schemas.types import TChallengerResponse
 from ..shared import (
     aclient,
     get_config,
@@ -21,8 +22,8 @@ router = APIRouter()
 async def get_challenge(
     flow: str,
     auth_user_id: str = Depends(with_optional_auth),
-    database: Redis = Depends(with_database),
-):
+    database: Redis[bytes] = Depends(with_database),
+) -> TChallengerResponse:
     if len(flow) != 64 or not all(x in "0123456789abcdef" for x in flow):
         raise HTTPException(400, "Invalid flow")
     user_id, guild_id, is_captcha = await database.hmget(
@@ -44,7 +45,7 @@ async def get_challenge(
     splash = None
     if await has_entitlement(database, guild_id.decode(), "branding_splash"):
         if await get_config(database, guild_id.decode(), "branding_splash_enabled"):
-            splash = f"https://cdn.cleanerbot.xyz/splash/{guild_id}"
+            splash = f"https://cdn.cleanerbot.xyz/splash/{guild_id.decode()}"
 
     return {
         "user": user,
@@ -59,8 +60,8 @@ async def post_challenge(
     flow: str,
     body: ChallengerRequest | None = None,
     auth_user_id: str = Depends(with_auth),
-    database: Redis = Depends(with_database),
-):
+    database: Redis[bytes] = Depends(with_database),
+) -> None:
     if len(flow) != 64 or not all(x in "0123456789abcdef" for x in flow):
         raise HTTPException(400, "Invalid flow")
     user_id, guild_id, is_captcha = await database.hmget(
@@ -80,7 +81,7 @@ async def post_challenge(
     if auth_user_id != user_id.decode():
         raise HTTPException(403, "Wrong user account")
 
-    if (body is None or body.token is None) == is_captcha is not None:
+    if (body is None or body.token is None) == (is_captcha is not None):
         raise HTTPException(400, "Expected or unexpected captcha token")
 
     if is_captcha is not None and body is not None:

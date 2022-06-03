@@ -25,8 +25,8 @@ async def get_stripe_checkout(
     guild_id: str,
     yearly: bool,
     user_id: str = Depends(with_auth),
-    database: Redis = Depends(with_database),
-):
+    database: Redis[bytes] = Depends(with_database),
+) -> str:
     await verify_guild_access(guild_id, database)
 
     if await database.exists((f"guild:{guild_id}:subscription",)):
@@ -57,16 +57,16 @@ async def get_stripe_checkout(
             },
         },
     )
-    return checkout_session.url
+    return checkout_session.url  # type: ignore
 
 
 @router.get("/billing/stripe/portal")
 @limiter.limit("2/30", "10/1h")
 async def get_stripe_portal(
-    guild_id: str = None,
+    guild_id: str | None = None,
     user_id: str = Depends(with_auth),
-    database: Redis = Depends(with_database),
-):
+    database: Redis[bytes] = Depends(with_database),
+) -> str:
     if guild_id is not None:
         customer_user, customer_platform = await database.hmget(
             f"guild:{guild_id}:subscription", ("user", "platform")
@@ -86,7 +86,7 @@ async def get_stripe_portal(
         customer=customer.decode(),
         return_url=f"{URL_ROOT}/dash/{guild_id}/plan" if guild_id else URL_ROOT,
     )
-    return portal_session.url
+    return portal_session.url  # type: ignore
 
 
 STRIPE_WEBHOOK_IPS = {
@@ -108,8 +108,8 @@ STRIPE_WEBHOOK_IPS = {
 @router.post("/billing/stripe/webhook", status_code=204)
 @limiter.only_count_failed
 async def post_stripe_webhook(
-    request: Request, database: Redis = Depends(with_database)
-):
+    request: Request, database: Redis[bytes] = Depends(with_database)
+) -> None:
     ip = request.headers.get("cf-connecting-ip", None)
     if ip is None or ip not in STRIPE_WEBHOOK_IPS:
         raise HTTPException(400, "IP lookup failed.")
@@ -175,8 +175,8 @@ async def post_stripe_webhook(
 async def get_coinbase_checkout(
     guild_id: str,
     user_id: str = Depends(with_auth),
-    database: Redis = Depends(with_database),
-):
+    database: Redis[bytes] = Depends(with_database),
+) -> str:
     await verify_guild_access(guild_id, database)
 
     if await database.exists((f"guild:{guild_id}:subscription",)):
@@ -200,8 +200,8 @@ async def get_coinbase_checkout(
 @router.post("/billing/coinbase/webhook", status_code=204)
 @limiter.only_count_failed
 async def post_coinbase_webhook(
-    request: Request, database: Redis = Depends(with_database)
-):
+    request: Request, database: Redis[bytes] = Depends(with_database)
+) -> None:
     sig_header = request.headers.get("X-CC-Webhook-Signature", None)
     if sig_header is None:
         raise HTTPException(400, "Missing signature")

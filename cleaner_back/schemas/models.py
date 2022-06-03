@@ -78,6 +78,13 @@ class DetailedGuildInfo(BaseModel):
     user: GIUser
 
 
+class PartialGuildInfo(BaseModel):
+    id: str
+    name: str
+    icon: str | None
+    access_type: int
+
+
 class ChallengerResponse(BaseModel):
     user: UserInfo
     is_valid: bool
@@ -100,3 +107,20 @@ class ChannelId(BaseModel):
 
 class RemoteAuth(BaseModel):
     code: str
+
+
+class RemoteAuthResponse(BaseModel):
+    token: str
+
+
+class OAuthCallbackResponse(BaseModel):
+    redirect: str
+    token: str | None
+    guild: str | None
+
+
+class GuildSnapshot(BaseModel):
+    id: str
+    timestamp: str
+    channels: int
+    roles: int

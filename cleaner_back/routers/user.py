@@ -5,9 +5,16 @@ from coredis import Redis
 from fastapi import APIRouter, Depends, HTTPException
 from jose import jws  # type: ignore
 
-from ..models import GuildInfo, RemoteAuth, UserInfo
-from ..shared import get_userme, is_suspended, limiter, with_auth, with_database
-from .guild import get_guilds
+from ..schemas.models import GuildInfo, RemoteAuth, UserInfo, RemoteAuthResponse
+from ..schemas.types import TGuildInfo, TUserInfo, TRemoteAuthResponse
+from ..shared import (
+    get_userme,
+    is_suspended,
+    limiter,
+    with_auth,
+    with_database,
+    get_guilds,
+)
 
 router = APIRouter()
 
@@ -15,16 +22,16 @@ router = APIRouter()
 @router.get("/user/@me", response_model=UserInfo)
 async def user_me(
     user_id: str = Depends(with_auth),
-    database: Redis = Depends(with_database),
-):
+    database: Redis[bytes] = Depends(with_database),
+) -> TUserInfo:
     return await get_userme(database, user_id)
 
 
 @router.delete("/user/@me/sessions", status_code=204)
 @limiter.limit("2/5minute")
 async def user_me_delete_sessions(
-    user_id: str = Depends(with_auth), database: Redis = Depends(with_database)
-):
+    user_id: str = Depends(with_auth), database: Redis[bytes] = Depends(with_database)
+) -> None:
     sessions = []
     async for session in database.scan_iter(f"user:{user_id}:dash:session:*"):
         sessions.append(session)
@@ -34,9 +41,10 @@ async def user_me_delete_sessions(
 
 @router.get("/user/@me/guilds", response_model=list[GuildInfo])
 async def user_me_guilds(
-    user_id: str = Depends(with_auth), database: Redis = Depends(with_database)
-):
-    guilds = [x for x in await get_guilds(database, user_id) if x["access_type"] >= 0]
+    user_id: str = Depends(with_auth), database: Redis[bytes] = Depends(with_database)
+) -> list[TGuildInfo]:
+    guilds: list[TGuildInfo]
+    guilds = [x for x in await get_guilds(database, user_id) if x["access_type"] >= 0]  # type: ignore
     for guild in guilds:
         guild_id = guild["id"]
         guild["is_added"] = await database.hexists(f"guild:{guild_id}:sync", "added")
@@ -48,16 +56,18 @@ async def user_me_guilds(
 @limiter.limit("5/1h")
 async def user_me_remote_auth(
     user_id: str = Depends(with_auth),
-    database: Redis = Depends(with_database),
-):
+    database: Redis[bytes] = Depends(with_database),
+) -> str:
     code = os.urandom(32).hex()
     await database.set(f"remote-auth:{code}", user_id, ex=300)
     return code
 
 
-@router.post("/remote-auth")
+@router.post("/remote-auth", response_model=RemoteAuthResponse)
 @limiter.limit("5/1h")
-async def remote_auth(auth: RemoteAuth, database: Redis = Depends(with_database)):
+async def remote_auth(
+    auth: RemoteAuth, database: Redis[bytes] = Depends(with_database)
+) -> TRemoteAuthResponse:
     code = auth.code
     if len(code) != 64 or not all(x in "0123456789abcdef" for x in code):
         raise HTTPException(400, "Bad code")

@@ -10,6 +10,8 @@ from hikari import BadRequestError, OAuth2Scope, Permissions, RESTApp, Unauthori
 from hikari.urls import BASE_URL
 from jose import jws  # type: ignore
 
+from ..schemas.models import OAuthCallbackResponse
+from ..schemas.types import TOAuthCallbackResponse
 from ..shared import limiter, with_database, with_hikari
 
 router = APIRouter()
@@ -48,11 +50,11 @@ async def oauth_redirect(
     bot: bool = False,
     with_admin: bool = False,
     verification: bool = False,
-    guild: str = None,
-    component: str = None,
-    flow: str = None,
+    guild: str | None = None,
+    component: str | None = None,
+    flow: str | None = None,
     change: bool = False,
-):
+) -> str:
     if flow is not None:
         if len(flow) != 64 or not all(x in "0123456789abcdef" for x in flow):
             raise HTTPException(400, "Invalid flow")
@@ -115,14 +117,14 @@ async def oauth_redirect(
     return f"{BASE_URL}{base}?{urlencode(query)}"
 
 
-@router.post("/oauth/callback")
+@router.post("/oauth/callback", response_model=OAuthCallbackResponse)
 @limiter.limit("2/1s", "4/10s")
 async def oauth_callback(
-    code: str = None,
-    state: str = None,
-    database: Redis = Depends(with_database),
+    code: str | None = None,
+    state: str | None = None,
+    database: Redis[bytes] = Depends(with_database),
     hikari: RESTApp = Depends(with_hikari),
-):
+) -> TOAuthCallbackResponse:
     if state is None or state[0] == "1":
         redirect_target = "/dash"
     elif state[0] == "0":
@@ -171,7 +173,9 @@ async def oauth_callback(
     except UnauthorizedError:
         raise HTTPException(401, "Very fast deauthorization you got there")
 
-    if set(scopes) - set(auth.scopes) or auth.user is None:
+    # no idea wtf mypy's issue is here
+    missing_scopes = set(scopes) - set(auth.scopes)  # type: ignore
+    if missing_scopes or auth.user is None:
         raise HTTPException(400, "Scope mismatch")
 
     expires_after = 60 * 60 * 24 * 7

@@ -1,5 +1,6 @@
 import asyncio
 import os
+import typing
 from datetime import datetime
 
 import hikari
@@ -14,6 +15,8 @@ from slowerapi import IPJail, Limiter, get_visitor_ip
 from slowerapi.jail import ReportFunc
 from slowerapi.reporters.cf import CloudflareIPAccessRuleReporter
 
+from .schemas.types import TPartialGuildInfo, TUserInfo
+
 home = "https://cleanerbot.xyz"
 redis_host = os.getenv("redis/host", "localhost")
 redis_passwd = os.getenv("redis/password")
@@ -22,7 +25,7 @@ aclient = AsyncClient(headers={"user-agent": "CleanerBot (cleanerbot.xyz 0.1.0)"
 hikari_rest = RESTApp()
 
 
-def with_database() -> Redis:
+def with_database() -> Redis[bytes]:
     return redis
 
 
@@ -35,14 +38,14 @@ async def with_hikari() -> RESTApp:
 
 
 async def with_auth(
-    x_token: str = Header(None), database: Redis = Depends(with_database)
-):
+    x_token: str = Header(None), database: Redis[bytes] = Depends(with_database)
+) -> str:
     if x_token is None:
         raise HTTPException(401, "Missing X-Token header")
 
     secret = os.getenv("backend/jwt-secret")
     try:
-        data = jws.verify(x_token, secret, algorithms=["HS256"])
+        data: bytes = jws.verify(x_token, secret, algorithms=["HS256"])
     except jws.JWSError:
         raise HTTPException(401, "Invalid X-Token header")
 
@@ -59,8 +62,8 @@ async def with_auth(
 
 
 async def with_optional_auth(
-    x_token: str = Header(None), database: Redis = Depends(with_database)
-):
+    x_token: str = Header(None), database: Redis[bytes] = Depends(with_database)
+) -> str | None:
     try:
         return await with_auth(x_token, database)
     except HTTPException:
@@ -68,13 +71,16 @@ async def with_optional_auth(
 
 
 async def has_entitlement(
-    database: Redis, guild_id: str | int, entitlement: str
+    database: Redis[bytes], guild_id: str | int, entitlement: str
 ) -> bool:
-    value = await database.hget(f"guild:{guild_id}:entitlements", entitlement)
-    if value is None:
+    raw_value: bytes | None = await database.hget(
+        f"guild:{guild_id}:entitlements", entitlement
+    )
+    value: int
+    if raw_value is None:
         value = GuildEntitlements.__fields__[entitlement].default
     else:
-        value = msgpack.unpackb(value)
+        value = msgpack.unpackb(raw_value)
 
     if value == 0:
         return True
@@ -83,21 +89,26 @@ async def has_entitlement(
     if plan is None:
         return False
 
-    return msgpack.unpackb(plan) >= value
+    decoded_plan: int = msgpack.unpackb(plan)
+    return decoded_plan >= value
 
 
-async def is_suspended(database: Redis, guild_id: str | int) -> bool:
-    return await get_entitlement(database, guild_id, "suspended")
+async def is_suspended(database: Redis[bytes], guild_id: str | int) -> bool:
+    return bool(await get_entitlement(database, guild_id, "suspended"))
 
 
-async def get_entitlement(database: Redis, guild_id: str | int, name: str) -> bool:
+async def get_entitlement(
+    database: Redis[bytes], guild_id: str | int, name: str
+) -> int:
     value = await database.hget(f"guild:{guild_id}:entitlements", name)
     if value is None:
-        return GuildEntitlements.__fields__[name].default
-    return getattr(GuildEntitlements(**{name: msgpack.unpackb(value)}), name)
+        return GuildEntitlements.__fields__[name].default  # type: ignore
+    return getattr(GuildEntitlements(**{name: msgpack.unpackb(value)}), name)  # type: ignore
 
 
-async def get_config(database: Redis, guild_id: str | int, name: str):
+async def get_config(
+    database: Redis[bytes], guild_id: str | int, name: str
+) -> typing.Any:
     value = await database.hget(f"guild:{guild_id}:config", name)
     if value is None:
         return GuildConfig.__fields__[name].default
@@ -108,10 +119,10 @@ get_guilds_lock: dict[str, asyncio.Event] = {}
 get_user_lock: dict[str, asyncio.Event] = {}
 
 
-async def get_guilds(database: Redis, user_id: str):
+async def get_guilds(database: Redis[bytes], user_id: str) -> list[TPartialGuildInfo]:
     cached = await database.get(f"cache:user:{user_id}:guilds")
     if cached is not None:
-        return msgpack.unpackb(cached)
+        return msgpack.unpackb(cached)  # type: ignore
 
     access_token = await database.get(f"user:{user_id}:oauth:token")
     if access_token is None:
@@ -122,7 +133,7 @@ async def get_guilds(database: Redis, user_id: str):
         await get_guilds_lock[user_id].wait()
         cached = await database.get(f"cache:user:{user_id}:guilds")
         if cached is not None:
-            return msgpack.unpackb(cached)
+            return msgpack.unpackb(cached)  # type: ignore
 
     get_guilds_lock[user_id] = asyncio.Event()
     try:
@@ -137,7 +148,7 @@ async def get_guilds(database: Redis, user_id: str):
         get_guilds_lock[user_id].set()
         del get_guilds_lock[user_id]
 
-    guildobj = [
+    guildobj: list[TPartialGuildInfo] = [
         {
             "id": str(guild.id),
             "name": guild.name,
@@ -152,7 +163,9 @@ async def get_guilds(database: Redis, user_id: str):
     return guildobj
 
 
-async def get_access_type(database: Redis, guild: hikari.OwnGuild, user_id: str):
+async def get_access_type(
+    database: Redis[bytes], guild: hikari.OwnGuild, user_id: str
+) -> int:
     if guild.is_owner:
         return 0
     permissions = await get_config(database, guild.id, "access_permissions")
@@ -170,10 +183,10 @@ async def get_access_type(database: Redis, guild: hikari.OwnGuild, user_id: str)
     return -1
 
 
-async def get_userme(database: Redis, user_id: str):
+async def get_userme(database: Redis[bytes], user_id: str) -> TUserInfo:
     cached = await database.get(f"cache:user:{user_id}")
     if cached is not None:
-        return msgpack.unpackb(cached)
+        return msgpack.unpackb(cached)  # type: ignore
 
     access_token = await database.get(f"user:{user_id}:oauth:token")
     if access_token is None:
@@ -184,7 +197,7 @@ async def get_userme(database: Redis, user_id: str):
         await get_user_lock[user_id].wait()
         cached = await database.get(f"cache:user:{user_id}")
         if cached is not None:
-            return msgpack.unpackb(cached)
+            return msgpack.unpackb(cached)  # type: ignore
 
     get_user_lock[user_id] = asyncio.Event()
     try:
@@ -199,8 +212,8 @@ async def get_userme(database: Redis, user_id: str):
         get_user_lock[user_id].set()
         del get_user_lock[user_id]
 
-    userobj = {
-        "id": user.id,
+    userobj: TUserInfo = {
+        "id": str(user.id),
         "name": user.username,
         "discriminator": user.discriminator,
         "avatar": user.avatar_hash,
@@ -210,13 +223,16 @@ async def get_userme(database: Redis, user_id: str):
     return userobj
 
 
-async def print_request(request: Request):
+async def print_request(request: Request) -> bytes:
     print(request.method, str(request.url))
     for header, value in request.headers.items():
         print(f"{header}: {value}")
     print()
     body = await request.body()
-    print(body)
+    try:
+        print(body.decode())
+    except UnicodeDecodeError:
+        print(body)
     return body
 
 

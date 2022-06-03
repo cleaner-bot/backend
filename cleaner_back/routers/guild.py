@@ -8,7 +8,14 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import ValidationError
 
 from ..access import Access, has_access
-from ..models import ChannelId, DetailedGuildInfo, StatisticsInfo
+from ..schemas.models import ChannelId, DetailedGuildInfo, StatisticsInfo, GuildSnapshot
+from ..schemas.types import (
+    TGIUser,
+    TPartialGuildInfo,
+    TDetailedGuildInfo,
+    TGuildSnapshot,
+    TStatisticsInfo,
+)
 from ..shared import (
     get_entitlement,
     get_guilds,
@@ -23,7 +30,9 @@ from ..shared import (
 router = APIRouter()
 
 
-async def check_guild(user_id: str, guild_id: str, database: Redis):
+async def check_guild(
+    user_id: str, guild_id: str, database: Redis[bytes]
+) -> TPartialGuildInfo:
     guilds = await get_guilds(database, user_id)
     for guild in guilds:
         if guild["id"] == guild_id and guild["access_type"] >= 0:
@@ -42,7 +51,9 @@ async def check_guild(user_id: str, guild_id: str, database: Redis):
     raise HTTPException(404, "Guild not found")
 
 
-async def verify_guild_access(guild_id: str, database: Redis, entitlement: str = None):
+async def verify_guild_access(
+    guild_id: str, database: Redis[bytes], entitlement: str | None = None
+) -> None:
     if await is_suspended(database, guild_id):
         raise HTTPException(403, "Guild is suspended")
     elif not await database.hexists(f"guild:{guild_id}:sync", "added"):
@@ -54,7 +65,9 @@ async def verify_guild_access(guild_id: str, database: Redis, entitlement: str =
         raise HTTPException(403, f"Guild does not have the {entitlement!r} entitlement")
 
 
-async def fetch_dict(database: Redis, key: str, keys: typing.Tuple[str, ...]):
+async def fetch_dict(
+    database: Redis[bytes], key: str, keys: typing.Tuple[str, ...]
+) -> dict[str, typing.Any]:
     values = await database.hmget(key, keys)
     return {k: msgpack.unpackb(v) for k, v in zip(keys, values) if v is not None}
 
@@ -63,14 +76,15 @@ async def fetch_dict(database: Redis, key: str, keys: typing.Tuple[str, ...]):
 async def get_guild(
     guild_id: str,
     user_id: str = Depends(with_auth),
-    database: Redis = Depends(with_database),
-):
+    database: Redis[bytes] = Depends(with_database),
+) -> TDetailedGuildInfo:
     try:
         guild = await check_guild(user_id, guild_id, database)
     except HTTPException:
         guild = None
 
-    user = await get_userme(database, user_id)
+    user: TGIUser
+    user = await get_userme(database, user_id)  # type: ignore
     if has_access(user_id):
         user["is_dev"] = True
 
@@ -101,8 +115,8 @@ async def get_guild(
             "id": guild["id"],
             "name": guild["name"],
         },
-        "entitlements": GuildEntitlements(**guild_entitlements),
-        "config": GuildConfig(**guild_config),
+        "entitlements": guild_entitlements,
+        "config": guild_config,
         "user": user,
     }
 
@@ -112,8 +126,8 @@ async def patch_guild_config(
     guild_id: str,
     changes: dict[str, typing.Any],
     user_id: str = Depends(with_auth),
-    database: Redis = Depends(with_database),
-):
+    database: Redis[bytes] = Depends(with_database),
+) -> None:
     await check_guild(user_id, guild_id, database)
 
     if not has_access(user_id):
@@ -150,8 +164,8 @@ async def patch_guild_entitlement(
     guild_id: str,
     changes: dict[str, typing.Any],
     user_id: str = Depends(with_auth),
-    database: Redis = Depends(with_database),
-):
+    database: Redis[bytes] = Depends(with_database),
+) -> None:
     await check_guild(user_id, guild_id, database)
 
     if not has_access(user_id, Access.DEVELOPER):
@@ -185,8 +199,8 @@ async def put_worker(
     guild_id: str,
     request: Request,
     user_id: str = Depends(with_auth),
-    database: Redis = Depends(with_database),
-):
+    database: Redis[bytes] = Depends(with_database),
+) -> None:
     await check_guild(user_id, guild_id, database)
     await verify_guild_access(guild_id, database, "workers")
 
@@ -206,8 +220,8 @@ async def post_guild_challenge_embed(
     guild_id: str,
     request: ChannelId,
     user_id: str = Depends(with_auth),
-    database: Redis = Depends(with_database),
-):
+    database: Redis[bytes] = Depends(with_database),
+) -> None:
     await check_guild(user_id, guild_id, database)
     await verify_guild_access(guild_id, database)
 
@@ -217,12 +231,12 @@ async def post_guild_challenge_embed(
     )
 
 
-@router.get("/guild/{guild_id}/backup/snapshot")
+@router.get("/guild/{guild_id}/backup/snapshot", response_model=list[GuildSnapshot])
 async def get_guild_snapshots(
     guild_id: str,
     user_id: str = Depends(with_auth),
-    database: Redis = Depends(with_database),
-):
+    database: Redis[bytes] = Depends(with_database),
+) -> list[TGuildSnapshot]:
     await check_guild(user_id, guild_id, database)
     await verify_guild_access(guild_id, database, "backup")
 
@@ -244,8 +258,8 @@ async def get_guild_snapshots(
 async def post_guild_snaphost(
     guild_id: str,
     user_id: str = Depends(with_auth),
-    database: Redis = Depends(with_database),
-):
+    database: Redis[bytes] = Depends(with_database),
+) -> None:
     await check_guild(user_id, guild_id, database)
     await verify_guild_access(guild_id, database, "backup")
 
@@ -275,8 +289,8 @@ async def post_apply_guild_snaphost(
     guild_id: str,
     snapshot_id: str,
     user_id: str = Depends(with_auth),
-    database: Redis = Depends(with_database),
-):
+    database: Redis[bytes] = Depends(with_database),
+) -> None:
     await check_guild(user_id, guild_id, database)
     await verify_guild_access(guild_id, database, "backup")
 
@@ -292,12 +306,12 @@ async def post_apply_guild_snaphost(
 async def get_guild_statistics(
     guild_id: str,
     user_id: str = Depends(with_auth),
-    database: Redis = Depends(with_database),
-):
+    database: Redis[bytes] = Depends(with_database),
+) -> TStatisticsInfo:
     await check_guild(user_id, guild_id, database)
     await verify_guild_access(guild_id, database, "statistics")
 
     data = await database.get(f"guild:{guild_id}:radar")
     if data is None:
-        raise HTTPException(500, "No data available currently.")
-    return msgpack.unpackb(data)
+        raise HTTPException(418, "No data available currently.")
+    return msgpack.unpackb(data)  # type: ignore

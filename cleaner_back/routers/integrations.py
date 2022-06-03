@@ -13,8 +13,8 @@ router = APIRouter()
 @router.post("/integrations/topgg/webhook", status_code=204)
 @limiter.only_count_failed
 async def post_topgg_webhook(
-    request: Request, database: Redis = Depends(with_database)
-):
+    request: Request, database: Redis[bytes] = Depends(with_database)
+) -> None:
     ip = request.headers.get("cf-connecting-ip", None)
     if ip != "159.203.105.187":
         raise HTTPException(400, "IP lookup failed.")
@@ -33,8 +33,8 @@ async def post_topgg_webhook(
 @limiter.only_count_failed
 async def post_dlist_webhook(
     request: Request,
-    database: Redis = Depends(with_database),
-):
+    database: Redis[bytes] = Depends(with_database),
+) -> None:
     body = (await print_request(request)).decode()
     secret = os.getenv("dlistgg/webhook-secret")
     try:

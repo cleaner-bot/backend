@@ -8,7 +8,8 @@ import msgpack  # type: ignore
 from coredis import Redis
 from fastapi import APIRouter, Depends, HTTPException, Request
 
-from ..models import VanityResponse
+from ..schemas.models import VanityResponse
+from ..schemas.types import TVanityResponse
 from ..shared import (
     get_config,
     get_entitlement,
@@ -21,7 +22,7 @@ from .guild import check_guild, verify_guild_access
 router = APIRouter()
 
 
-def generate_upload_url(guild_id: str, category: str):
+def generate_upload_url(guild_id: str, category: str) -> str:
     key = os.getenv("backend/cdn-secret")
     if key is None:
         raise HTTPException(500, "Configuration issue, please contact support")
@@ -40,8 +41,8 @@ def generate_upload_url(guild_id: str, category: str):
 async def post_branding_splash_asset_url(
     guild_id: str,
     user_id: str = Depends(with_auth),
-    database: Redis = Depends(with_database),
-):
+    database: Redis[bytes] = Depends(with_database),
+) -> str:
     await check_guild(user_id, guild_id, database)
     await verify_guild_access(guild_id, database, "branding_splash")
 
@@ -54,8 +55,8 @@ async def put_branding_vanity(
     guild_id: str,
     request: Request,
     user_id: str = Depends(with_auth),
-    database: Redis = Depends(with_database),
-):
+    database: Redis[bytes] = Depends(with_database),
+) -> None:
     await check_guild(user_id, guild_id, database)
     await verify_guild_access(guild_id, database, "branding_vanity")
 
@@ -76,12 +77,14 @@ async def put_branding_vanity(
 
     operation = {"branding_vanity_url": msgpack.packb(vanity)}
     await database.hset(f"guild:{guild_id}:entitlements", operation)  # type: ignore
-    payload = {"guild_id": int(guild_id), "entitlements": operation}  # type: ignore
+    payload = {"guild_id": int(guild_id), "entitlements": operation}
     await database.publish("pubsub:settings-update", msgpack.packb(payload))
 
 
 @router.get("/vanity/{vanity}", response_model=VanityResponse)
-async def get_vanity(vanity: str, database: Redis = Depends(with_database)):
+async def get_vanity(
+    vanity: str, database: Redis[bytes] = Depends(with_database)
+) -> TVanityResponse:
     if not re.fullmatch(r"[a-z\d-]{2,32}", vanity):
         raise HTTPException(404, "Vanity not found")
     guild = await database.get(f"vanity:{vanity}")
@@ -94,6 +97,6 @@ async def get_vanity(vanity: str, database: Redis = Depends(with_database)):
             splash = True
 
     return {
-        "guild": guild,
+        "guild": str(guild),
         "splash": splash,
     }
