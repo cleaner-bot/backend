@@ -10,7 +10,6 @@ from ..shared import (
     get_config,
     get_userme,
     has_entitlement,
-    with_auth,
     with_database,
     with_optional_auth,
 )
@@ -80,9 +79,9 @@ async def post_challenge(
 
     forced_captcha = is_captcha
     if auth_user_id != user_id.decode():
-        if forced_captcha:
+        if forced_captcha is not None:
             raise HTTPException(403, "Wrong user account")
-        is_captcha = True
+        is_captcha = b"1"
 
     if (body is None or body.token is None) == (is_captcha is not None):
         raise HTTPException(400, "Expected or unexpected captcha token")
