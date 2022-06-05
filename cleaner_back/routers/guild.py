@@ -115,8 +115,8 @@ async def get_guild(
             "id": guild["id"],
             "name": guild["name"],
         },
-        "entitlements": guild_entitlements,
-        "config": guild_config,
+        "entitlements": GuildEntitlements(**guild_entitlements),  # type: ignore
+        "config": GuildConfig(**guild_config),  # type: ignore
         "user": user,
     }
 
