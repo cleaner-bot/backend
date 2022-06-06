@@ -32,7 +32,7 @@ async def user_me(
 async def user_me_delete_sessions(
     user_id: str = Depends(with_auth), database: Redis[bytes] = Depends(with_database)
 ) -> None:
-    sessions = []
+    sessions: list[bytes | str] = []
     async for session in database.scan_iter(f"user:{user_id}:dash:session:*"):
         sessions.append(session)
     if sessions:
