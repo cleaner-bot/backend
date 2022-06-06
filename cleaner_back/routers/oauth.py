@@ -31,6 +31,7 @@ allowed_components = (
     "slowmode",
     "challenge",
     "verification",
+    "joinguard",
     "logging",
     "impersonation",
     "report",
