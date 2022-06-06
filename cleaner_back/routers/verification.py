@@ -1,4 +1,3 @@
-
 import msgpack  # type: ignore
 from coredis import Redis
 from fastapi import APIRouter, Depends, HTTPException
