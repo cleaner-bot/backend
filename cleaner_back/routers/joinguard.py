@@ -8,6 +8,7 @@ from ..schemas.types import TChallengerResponseWithJoinScope
 from ..shared import (
     get_auth_object,
     get_config,
+    get_guilds,
     get_userme,
     has_entitlement,
     verify_captcha,
@@ -39,13 +40,13 @@ async def get_verification(
         if await get_config(database, guild, "branding_splash_enabled"):
             splash = f"https://cdn.cleanerbot.xyz/splash/{guild}"
 
+    guilds = await get_guilds(database, user_id)
+    is_valid = all(x["id"] != str(guild) for x in guilds)
+
     return {
         "user": user,
         "has_join_scope": OAuth2Scope.GUILDS_JOIN in auth_object["scopes"],
-        "is_valid": await database.exists(
-            (f"guild:{guild}:user:{user_id}:verification",)
-        )
-        > 0,
+        "is_valid": is_valid,
         "captcha_required": await get_config(database, guild, "joinguard_captcha"),
         "splash": splash,
     }
