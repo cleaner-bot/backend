@@ -72,7 +72,7 @@ class TGIUser(TUserInfo):
 
 class TDetailedGuildInfo(typing.TypedDict, total=False):
     guild: TGIGuild | None
-    entitlements: dict[str, int] | None
+    entitlements: dict[str, typing.Any] | None
     config: dict[str, typing.Any] | None
     user: TGIUser
 
