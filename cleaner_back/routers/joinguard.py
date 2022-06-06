@@ -68,8 +68,16 @@ async def post_verification(
 
     is_captcha = await get_config(database, guild, "joinguard_captcha")
 
+    auth_object = await get_auth_object(database, user_id)
+    if OAuth2Scope.GUILDS_JOIN not in auth_object["scopes"]:
+        raise HTTPException(400, "Missing guilds.join scope")
+
     if (body is None or body.token is None) == (is_captcha is not None):
         raise HTTPException(400, "Expected or unexpected captcha token")
+
+    guilds = await get_guilds(database, user_id)
+    if any(x["id"] == str(guild) for x in guilds):
+        raise HTTPException(400, "Already joined guild")
 
     if is_captcha:
         assert body.token
@@ -77,5 +85,7 @@ async def post_verification(
 
     await database.publish(
         "pubsub:joinguard",
-        msgpack.packb({"guild": guild, "user": int(user_id)}),
+        msgpack.packb(
+            {"guild": guild, "user": int(user_id), "token": auth_object["token"]}
+        ),
     )
