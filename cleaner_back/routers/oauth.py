@@ -16,11 +16,8 @@ from ..shared import limiter, with_database, with_hikari
 
 router = APIRouter()
 
-
-base = "/oauth2/authorize"
+required_scopes = (OAuth2Scope.IDENTIFY, OAuth2Scope.GUILDS)
 redirect_uri = "https://cleanerbot.xyz/oauth-comeback"
-response_type = "code"
-scopes = [OAuth2Scope.IDENTIFY, OAuth2Scope.GUILDS]
 
 allowed_components = (
     "",
@@ -50,6 +47,7 @@ allowed_components = (
 async def oauth_redirect(
     bot: bool = False,
     with_admin: bool = False,
+    with_join: bool = False,
     verification: bool = False,
     guild: str | None = None,
     component: str | None = None,
@@ -81,13 +79,17 @@ async def oauth_redirect(
     if client_id is None:
         raise HTTPException(500, "Configuration issue, please contact support")
 
+    scopes = list(required_scopes)
+
     query = {
         "client_id": client_id,
         "redirect_uri": redirect_uri,
-        "response_type": response_type,
-        "scope": " ".join(scopes),
+        "response_type": "code",
         "state": state,
     }
+
+    if with_join:
+        scopes.append(OAuth2Scope.GUILDS_JOIN)
 
     if not change:
         query["prompt"] = "none"
@@ -109,13 +111,15 @@ async def oauth_redirect(
         if with_admin:
             permissions |= Permissions.ADMINISTRATOR
 
-        query["scope"] += " bot applications.commands"
+        scopes.extend((OAuth2Scope.BOT, OAuth2Scope.APPLICATIONS_COMMANDS))
         query["permissions"] = str(int(permissions))
         if guild:
             query["guild_id"] = guild
             query["disable_guild_select"] = "true"
 
-    return f"{BASE_URL}{base}?{urlencode(query)}"
+    query["scope"] = " ".join(scopes)
+
+    return f"{BASE_URL}/oauth2/authorize?{urlencode(query)}"
 
 
 @router.post("/oauth/callback", response_model=OAuthCallbackResponse)
@@ -175,7 +179,7 @@ async def oauth_callback(
         raise HTTPException(401, "Very fast deauthorization you got there")
 
     # no idea wtf mypy's issue is here
-    missing_scopes = set(scopes) - set(auth.scopes)  # type: ignore
+    missing_scopes = set(required_scopes) - set(auth.scopes)  # type: ignore
     if missing_scopes or auth.user is None:
         raise HTTPException(400, "Scope mismatch")
 
