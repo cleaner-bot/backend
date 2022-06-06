@@ -97,6 +97,6 @@ async def get_vanity(
             splash = True
 
     return {
-        "guild": str(guild),
+        "guild": guild.decode(),
         "splash": splash,
     }
