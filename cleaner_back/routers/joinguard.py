@@ -72,7 +72,7 @@ async def post_verification(
     if OAuth2Scope.GUILDS_JOIN not in auth_object["scopes"]:
         raise HTTPException(400, "Missing guilds.join scope")
 
-    if (body is None or body.token is None) == (is_captcha is not None):
+    if (body is None or body.token is None) == is_captcha:
         raise HTTPException(400, "Expected or unexpected captcha token")
 
     guilds = await get_guilds(database, user_id)
