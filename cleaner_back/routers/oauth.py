@@ -47,7 +47,7 @@ allowed_components = (
 async def oauth_redirect(
     bot: bool = False,
     with_admin: bool = False,
-    with_join: bool = False,
+    joinguard: bool = False,
     verification: bool = False,
     guild: str | None = None,
     component: str | None = None,
@@ -60,20 +60,24 @@ async def oauth_redirect(
         state = f"0{flow}"
     elif guild is None:
         state = "1"
-    elif verification:
+    elif joinguard:
         if not guild.isdigit():
             raise HTTPException(400, "Invalid guild id")
         state = f"2{guild}"
-    elif component is None:
+    elif verification:
         if not guild.isdigit():
             raise HTTPException(400, "Invalid guild id")
         state = f"3{guild}"
+    elif component is None:
+        if not guild.isdigit():
+            raise HTTPException(400, "Invalid guild id")
+        state = f"4{guild}"
     else:
         if not guild.isdigit():
             raise HTTPException(400, "Invalid guild id")
         if component not in allowed_components:
             raise HTTPException(400, "Invalid component")
-        state = f"4{guild}.{allowed_components.index(component)}"
+        state = f"5{guild}.{allowed_components.index(component)}"
 
     client_id = os.getenv("discord/client-id")
     if client_id is None:
@@ -88,7 +92,7 @@ async def oauth_redirect(
         "state": state,
     }
 
-    if with_join:
+    if joinguard:
         scopes.append(OAuth2Scope.GUILDS_JOIN)
 
     if not change:
@@ -141,13 +145,18 @@ async def oauth_callback(
         guild_id = state[1:]
         if not guild_id.isdigit():
             raise HTTPException(400, "Invalid state")
-        redirect_target = f"/verify?guild={guild_id}"
+        redirect_target = f"/join?guild={guild_id}"
     elif state[0] == "3":
         guild_id = state[1:]
         if not guild_id.isdigit():
             raise HTTPException(400, "Invalid state")
-        redirect_target = f"/dash/{guild_id}"
+        redirect_target = f"/verify?guild={guild_id}"
     elif state[0] == "4":
+        guild_id = state[1:]
+        if not guild_id.isdigit():
+            raise HTTPException(400, "Invalid state")
+        redirect_target = f"/dash/{guild_id}"
+    elif state[0] == "5":
         guild_id, component = state[1:].split("-")
         if not guild_id.isdigit() or not component.isdigit():
             raise HTTPException(400, "Invalid state")
