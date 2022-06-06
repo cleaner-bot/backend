@@ -84,6 +84,10 @@ class TChallengerResponse(typing.TypedDict):
     splash: str | None
 
 
+class TChallengerResponseWithJoinScope(TChallengerResponse):
+    has_join_scope: bool
+
+
 class TChallengerRequest(typing.TypedDict):
     token: str | None
 

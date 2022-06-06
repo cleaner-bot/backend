@@ -1,15 +1,13 @@
-import os
-
 from coredis import Redis
 from fastapi import APIRouter, Depends, HTTPException
 
 from ..schemas.models import ChallengerRequest, ChallengerResponse
 from ..schemas.types import TChallengerResponse
 from ..shared import (
-    aclient,
     get_config,
     get_userme,
     has_entitlement,
+    verify_captcha,
     with_database,
     with_optional_auth,
 )
@@ -87,20 +85,7 @@ async def post_challenge(
         raise HTTPException(400, "Expected or unexpected captcha token")
 
     if is_captcha is not None and body is not None:
-        hcaptcha_secret = os.getenv("hcaptcha/secret")
-        hcaptcha_sitekey = os.getenv("hcaptcha/sitekey")
-        if hcaptcha_secret is None or hcaptcha_sitekey is None:
-            raise HTTPException(500, "Configuration issue, please contact support")
-        res = await aclient.post(
-            "https://hcaptcha.com/siteverify",
-            data={
-                "secret": hcaptcha_secret,
-                "sitekey": hcaptcha_sitekey,
-                "response": body.token,
-            },
-        )
-        data = res.json()
-        if not data["success"]:
-            raise HTTPException(400, "Invalid captcha token")
+        assert body.token
+        await verify_captcha(body.token)
 
     await database.publish("pubsub:challenge-verify", flow)

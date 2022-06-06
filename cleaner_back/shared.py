@@ -117,7 +117,7 @@ async def get_config(
     return getattr(GuildConfig(**{name: msgpack.unpackb(value)}), name)
 
 
-async def get_auth_object(user_id: str, database: Redis[bytes]) -> TAuthObject:
+async def get_auth_object(database: Redis[bytes], user_id: str) -> TAuthObject:
     raw_auth_object = await database.get(f"user:{user_id}:oauth")
     if raw_auth_object is None:
         raise HTTPException(401, "Session expired")
@@ -134,7 +134,7 @@ async def get_guilds(database: Redis[bytes], user_id: str) -> list[TPartialGuild
     if cached is not None:
         return msgpack.unpackb(cached)  # type: ignore
 
-    auth_object = await get_auth_object(user_id, database)
+    auth_object = await get_auth_object(database, user_id)
 
     print("guild cache missed", user_id in get_guilds_lock and "locked" or "locking")
     if user_id in get_guilds_lock:
@@ -196,7 +196,7 @@ async def get_userme(database: Redis[bytes], user_id: str) -> TUserInfo:
     if cached is not None:
         return msgpack.unpackb(cached)  # type: ignore
 
-    auth_object = await get_auth_object(user_id, database)
+    auth_object = await get_auth_object(database, user_id)
 
     print("user cache missed", user_id in get_user_lock and "locked" or "locking")
     if user_id in get_user_lock:
@@ -227,6 +227,24 @@ async def get_userme(database: Redis[bytes], user_id: str) -> TUserInfo:
     await database.set(f"cache:user:{user_id}", msgpack.packb(userobj), ex=30)
 
     return userobj
+
+
+async def verify_captcha(token: str) -> None:
+    hcaptcha_secret = os.getenv("hcaptcha/secret")
+    hcaptcha_sitekey = os.getenv("hcaptcha/sitekey")
+    if hcaptcha_secret is None or hcaptcha_sitekey is None:
+        raise HTTPException(500, "Configuration issue, please contact support")
+    res = await aclient.post(
+        "https://hcaptcha.com/siteverify",
+        data={
+            "secret": hcaptcha_secret,
+            "sitekey": hcaptcha_sitekey,
+            "response": token,
+        },
+    )
+    data = res.json()
+    if not data["success"]:
+        raise HTTPException(400, "Invalid captcha token")
 
 
 async def print_request(request: Request) -> bytes:

@@ -1,11 +1,12 @@
-
 import msgpack  # type: ignore
 from coredis import Redis
 from fastapi import APIRouter, Depends, HTTPException
+from hikari import OAuth2Scope
 
-from ..schemas.models import ChallengerRequest, ChallengerResponse
-from ..schemas.types import TChallengerResponse
+from ..schemas.models import ChallengerRequest, ChallengerResponseWithJoinScope
+from ..schemas.types import TChallengerResponseWithJoinScope
 from ..shared import (
+    get_auth_object,
     get_config,
     get_userme,
     has_entitlement,
@@ -17,20 +18,21 @@ from ..shared import (
 router = APIRouter()
 
 
-@router.get("/verification", response_model=ChallengerResponse)
+@router.get("/joinguard", response_model=ChallengerResponseWithJoinScope)
 async def get_verification(
     guild: int,
     user_id: str = Depends(with_auth),
     database: Redis[bytes] = Depends(with_database),
-) -> TChallengerResponse:
+) -> TChallengerResponseWithJoinScope:
     if not await database.hexists(f"guild:{guild}:sync", "added"):
         raise HTTPException(404, "Guild not found")
-    elif not await get_config(database, guild, "verification_enabled"):
-        raise HTTPException(400, "Guild does not have verification enabled")
-    elif await get_config(database, guild, "verification_role") == "0":
-        raise HTTPException(400, "Guild does not have a verification role")
+    elif not await get_config(database, guild, "joinguard_enabled"):
+        raise HTTPException(400, "Guild does not have joinguard enabled")
+    elif not await has_entitlement(database, guild, "joinguard"):
+        raise HTTPException(400, "Guild does not have joinguard enabled")
 
     user = await get_userme(database, user_id)
+    auth_object = await get_auth_object(database, user_id)
 
     splash = None
     if await has_entitlement(database, guild, "branding_splash"):
@@ -39,16 +41,17 @@ async def get_verification(
 
     return {
         "user": user,
+        "has_join_scope": OAuth2Scope.GUILDS_JOIN in auth_object["scopes"],
         "is_valid": await database.exists(
             (f"guild:{guild}:user:{user_id}:verification",)
         )
         > 0,
-        "captcha_required": False,  # TODO: captcha logic
+        "captcha_required": await get_config(database, guild, "joinguard_captcha"),
         "splash": splash,
     }
 
 
-@router.post("/verification", status_code=204)
+@router.post("/joinguard", status_code=204)
 async def post_verification(
     guild: int,
     body: ChallengerRequest,
@@ -57,20 +60,21 @@ async def post_verification(
 ) -> None:
     if not await database.hexists(f"guild:{guild}:sync", "added"):
         raise HTTPException(404, "Guild not found")
-    elif not await get_config(database, guild, "verification_enabled"):
-        raise HTTPException(400, "Guild does not have verification enabled")
-    elif await get_config(database, guild, "verification_role") == "0":
-        raise HTTPException(400, "Guild does not have a verification role")
+    elif not await get_config(database, guild, "joinguard_enabled"):
+        raise HTTPException(400, "Guild does not have joinguard enabled")
+    elif not await has_entitlement(database, guild, "joinguard"):
+        raise HTTPException(400, "Guild does not have joinguard enabled")
 
-    if not await database.exists((f"guild:{guild}:user:{user_id}:verification",)):
-        raise HTTPException(404, "You are not pending verification.")
+    is_captcha = await get_config(database, guild, "joinguard_captcha")
 
-    is_captcha = body.token is not None  # TODO: captcha logic
+    if (body is None or body.token is None) == (is_captcha is not None):
+        raise HTTPException(400, "Expected or unexpected captcha token")
+
     if is_captcha:
         assert body.token
         await verify_captcha(body.token)
 
     await database.publish(
-        "pubsub:verification-verify",
+        "pubsub:joinguard",
         msgpack.packb({"guild": guild, "user": int(user_id)}),
     )

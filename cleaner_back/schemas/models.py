@@ -92,6 +92,14 @@ class ChallengerResponse(BaseModel):
     splash: str | None
 
 
+class ChallengerResponseWithJoinScope(BaseModel):
+    user: UserInfo
+    is_valid: bool
+    has_join_scope: bool
+    captcha_required: bool
+    splash: str | None
+
+
 class ChallengerRequest(BaseModel):
     token: str | None
 
