@@ -15,7 +15,7 @@ from slowerapi import IPJail, Limiter, get_visitor_ip
 from slowerapi.jail import ReportFunc
 from slowerapi.reporters.cf import CloudflareIPAccessRuleReporter
 
-from .schemas.types import TPartialGuildInfo, TUserInfo
+from .schemas.types import TAuthObject, TPartialGuildInfo, TUserInfo
 
 home = "https://cleanerbot.xyz"
 redis_host = os.getenv("redis/host", "localhost")
@@ -117,6 +117,14 @@ async def get_config(
     return getattr(GuildConfig(**{name: msgpack.unpackb(value)}), name)
 
 
+async def get_auth_object(user_id: str, database: Redis[bytes]) -> TAuthObject:
+    raw_auth_object = await database.get(f"user:{user_id}:oauth")
+    if raw_auth_object is None:
+        raise HTTPException(401, "Session expired")
+    auth_object = msgpack.unpackb(raw_auth_object)
+    return auth_object  # type: ignore
+
+
 get_guilds_lock: dict[str, asyncio.Event] = {}
 get_user_lock: dict[str, asyncio.Event] = {}
 
@@ -126,9 +134,7 @@ async def get_guilds(database: Redis[bytes], user_id: str) -> list[TPartialGuild
     if cached is not None:
         return msgpack.unpackb(cached)  # type: ignore
 
-    access_token = await database.get(f"user:{user_id}:oauth:token")
-    if access_token is None:
-        raise HTTPException(401, "Session expired")
+    auth_object = await get_auth_object(user_id, database)
 
     print("guild cache missed", user_id in get_guilds_lock and "locked" or "locking")
     if user_id in get_guilds_lock:
@@ -139,11 +145,11 @@ async def get_guilds(database: Redis[bytes], user_id: str) -> list[TPartialGuild
 
     get_guilds_lock[user_id] = asyncio.Event()
     try:
-        async with hikari_rest.acquire(access_token.decode(), "Bearer") as selfbot:
+        async with hikari_rest.acquire(auth_object["token"], "Bearer") as selfbot:
             guilds = await selfbot.fetch_my_guilds()
 
     except UnauthorizedError:
-        await database.delete((f"user:{user_id}:oauth:token",))
+        await database.delete((f"user:{user_id}:oauth",))
         raise HTTPException(401, "Session expired")
 
     finally:
@@ -190,9 +196,7 @@ async def get_userme(database: Redis[bytes], user_id: str) -> TUserInfo:
     if cached is not None:
         return msgpack.unpackb(cached)  # type: ignore
 
-    access_token = await database.get(f"user:{user_id}:oauth:token")
-    if access_token is None:
-        raise HTTPException(401, "Session expired")
+    auth_object = await get_auth_object(user_id, database)
 
     print("user cache missed", user_id in get_user_lock and "locked" or "locking")
     if user_id in get_user_lock:
@@ -203,11 +207,11 @@ async def get_userme(database: Redis[bytes], user_id: str) -> TUserInfo:
 
     get_user_lock[user_id] = asyncio.Event()
     try:
-        async with hikari_rest.acquire(access_token.decode(), "Bearer") as selfbot:
+        async with hikari_rest.acquire(auth_object["token"], "Bearer") as selfbot:
             user = await selfbot.fetch_my_user()
 
     except UnauthorizedError:
-        await database.delete((f"user:{user_id}:oauth:token",))
+        await database.delete((f"user:{user_id}:oauth",))
         raise HTTPException(401, "Session expired")
 
     finally:

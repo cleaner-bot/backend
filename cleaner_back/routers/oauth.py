@@ -189,8 +189,13 @@ async def oauth_callback(
 
     data = f"{int(expires.timestamp())}.{session.hex()}.{auth.user.id}"
 
+    auth_object = {
+        "token": authtoken.access_token,
+        "scopes": auth.scopes,
+    }
+
     await database.set(
-        f"user:{auth.user.id}:oauth:token", authtoken.access_token, ex=expires_after
+        f"user:{auth.user.id}:oauth", msgpack.packb(auth_object), ex=expires_after
     )
     await database.set(
         f"user:{auth.user.id}:dash:session:{session.hex()}", 1, ex=expires_after

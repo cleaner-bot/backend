@@ -116,3 +116,8 @@ class TGuildSnapshot(typing.TypedDict):
     timestamp: str
     channels: int
     roles: int
+
+
+class TAuthObject(typing.TypedDict):
+    token: str
+    scopes: list[str]
