@@ -8,6 +8,7 @@ import msgpack  # type: ignore
 from coredis import Redis
 from fastapi import APIRouter, Depends, HTTPException, Request
 
+from ..access import Access, has_access
 from ..schemas.models import VanityResponse
 from ..schemas.types import TVanityResponse
 from ..shared import (
@@ -20,6 +21,7 @@ from ..shared import (
 from .guild import check_guild, verify_guild_access
 
 router = APIRouter()
+BLACKLIST_VANITY = ("cleaner", "discord", "nitro", "pro", "premium", "free", "gift")
 
 
 def generate_upload_url(guild_id: str, category: str) -> str:
@@ -68,6 +70,14 @@ async def put_branding_vanity(
             raise HTTPException(400, "Vanity url is not qualified")
         elif await database.exists((f"vanity:{vanity}",)):
             raise HTTPException(400, "Vanity url is already taken")
+
+        if has_access(user_id, Access.DEVELOPER):
+            for keyword in BLACKLIST_VANITY:
+                if keyword in vanity:
+                    raise HTTPException(
+                        400, f"Vanity url contains blacklisted keyword: {keyword}"
+                    )
+
     elif not old_vanity:
         raise HTTPException(400, "No vanity url set")
 
