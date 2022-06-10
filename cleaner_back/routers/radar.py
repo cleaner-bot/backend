@@ -1,3 +1,5 @@
+import typing
+
 import msgpack  # type: ignore
 from coredis import Redis
 from fastapi import APIRouter, Depends, HTTPException
@@ -14,4 +16,4 @@ async def get_radar(database: Redis[bytes] = Depends(with_database)) -> TRadarIn
     data = await database.get("radar")
     if data is None:
         raise HTTPException(500, "No data available currently.")
-    return msgpack.unpackb(data)  # type: ignore
+    return typing.cast(TRadarInfo, msgpack.unpackb(data))

@@ -102,10 +102,10 @@ async def get_entitlement(
 ) -> int:
     value = await database.hget(f"guild:{guild_id}:entitlements", name)
     if value is None:
-        return GuildEntitlements.__fields__[name].default  # type: ignore
-    return getattr(  # type: ignore
+        return typing.cast(int, GuildEntitlements.__fields__[name].default)
+    return typing.cast(int, getattr(
         GuildEntitlements(**{name: msgpack.unpackb(value)}), name
-    )
+    ))
 
 
 async def get_config(
@@ -122,7 +122,7 @@ async def get_auth_object(database: Redis[bytes], user_id: str) -> TAuthObject:
     if raw_auth_object is None:
         raise HTTPException(401, "Session expired")
     auth_object = msgpack.unpackb(raw_auth_object)
-    return auth_object  # type: ignore
+    return typing.cast(TAuthObject, auth_object)
 
 
 get_guilds_lock: dict[str, asyncio.Event] = {}
@@ -132,7 +132,7 @@ get_user_lock: dict[str, asyncio.Event] = {}
 async def get_guilds(database: Redis[bytes], user_id: str) -> list[TPartialGuildInfo]:
     cached = await database.get(f"cache:user:{user_id}:guilds")
     if cached is not None:
-        return msgpack.unpackb(cached)  # type: ignore
+        return typing.cast(list[TPartialGuildInfo], msgpack.unpackb(cached))
 
     auth_object = await get_auth_object(database, user_id)
 
@@ -141,7 +141,7 @@ async def get_guilds(database: Redis[bytes], user_id: str) -> list[TPartialGuild
         await get_guilds_lock[user_id].wait()
         cached = await database.get(f"cache:user:{user_id}:guilds")
         if cached is not None:
-            return msgpack.unpackb(cached)  # type: ignore
+            return typing.cast(list[TPartialGuildInfo], msgpack.unpackb(cached))
 
     get_guilds_lock[user_id] = asyncio.Event()
     try:
@@ -194,7 +194,7 @@ async def get_access_type(
 async def get_userme(database: Redis[bytes], user_id: str) -> TUserInfo:
     cached = await database.get(f"cache:user:{user_id}")
     if cached is not None:
-        return msgpack.unpackb(cached)  # type: ignore
+        return typing.cast(TUserInfo, msgpack.unpackb(cached))
 
     auth_object = await get_auth_object(database, user_id)
 
@@ -203,7 +203,7 @@ async def get_userme(database: Redis[bytes], user_id: str) -> TUserInfo:
         await get_user_lock[user_id].wait()
         cached = await database.get(f"cache:user:{user_id}")
         if cached is not None:
-            return msgpack.unpackb(cached)  # type: ignore
+            return typing.cast(TUserInfo, msgpack.unpackb(cached))
 
     get_user_lock[user_id] = asyncio.Event()
     try:

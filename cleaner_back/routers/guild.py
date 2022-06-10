@@ -83,8 +83,7 @@ async def get_guild(
     except HTTPException:
         guild = None
 
-    user: TGIUser
-    user = await get_userme(database, user_id)  # type: ignore
+    user = typing.cast(TGIUser, await get_userme(database, user_id))
     if has_access(user_id):
         user["is_dev"] = True
 
@@ -115,8 +114,8 @@ async def get_guild(
             "id": guild["id"],
             "name": guild["name"],
         },
-        "entitlements": GuildEntitlements(**guild_entitlements),  # type: ignore
-        "config": GuildConfig(**guild_config),  # type: ignore
+        "entitlements": GuildEntitlements(**guild_entitlements),
+        "config": GuildConfig(**guild_config),
         "user": user,
     }
 

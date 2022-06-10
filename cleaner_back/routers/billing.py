@@ -1,4 +1,5 @@
 import os
+import typing
 from datetime import datetime
 
 import msgpack  # type: ignore
@@ -219,7 +220,7 @@ async def post_coinbase_webhook(
         raise HTTPException(400, "Invalid signature")
 
     if event["type"] in ("charge:confirmed", "charge:resolved"):
-        data: Charge = event["data"]  # type: ignore
+        data = typing.cast(Charge, event["data"])
         guild_id = data["metadata"]["guild"]
         user_id = data["metadata"]["user"]
         await database.hset(
