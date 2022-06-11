@@ -1,3 +1,4 @@
+import ipaddress
 import os
 import typing
 from datetime import datetime
@@ -198,11 +199,18 @@ async def get_coinbase_checkout(
     return charge["hosted_url"]
 
 
+COINBASE_WEBHOOK_IPS = ipaddress.IPv4Network("54.175.255.192/27")
+
+
 @router.post("/billing/coinbase/webhook", status_code=204)
 @limiter.only_count_failed
 async def post_coinbase_webhook(
     request: Request, database: Redis[bytes] = Depends(with_database)
 ) -> None:
+    ip = request.headers.get("cf-connecting-ip", None)
+    if ip is None or ipaddress.IPv4Address(ip) not in COINBASE_WEBHOOK_IPS:
+        raise HTTPException(400, "IP lookup failed.")
+
     sig_header = request.headers.get("X-CC-Webhook-Signature", None)
     if sig_header is None:
         raise HTTPException(400, "Missing signature")
