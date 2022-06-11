@@ -103,9 +103,9 @@ async def get_entitlement(
     value = await database.hget(f"guild:{guild_id}:entitlements", name)
     if value is None:
         return typing.cast(int, GuildEntitlements.__fields__[name].default)
-    return typing.cast(int, getattr(
-        GuildEntitlements(**{name: msgpack.unpackb(value)}), name
-    ))
+    return typing.cast(
+        int, getattr(GuildEntitlements(**{name: msgpack.unpackb(value)}), name)
+    )
 
 
 async def get_config(
