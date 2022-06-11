@@ -312,5 +312,5 @@ async def get_guild_statistics(
 
     data = await database.get(f"guild:{guild_id}:radar")
     if data is None:
-        raise HTTPException(418, "No data available currently.")
+        raise HTTPException(404, "No data available currently.")
     return msgpack.unpackb(data)  # type: ignore

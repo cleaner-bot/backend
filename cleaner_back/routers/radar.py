@@ -15,5 +15,5 @@ router = APIRouter()
 async def get_radar(database: Redis[bytes] = Depends(with_database)) -> TRadarInfo:
     data = await database.get("radar")
     if data is None:
-        raise HTTPException(500, "No data available currently.")
+        raise HTTPException(404, "No data available currently.")
     return typing.cast(TRadarInfo, msgpack.unpackb(data))
