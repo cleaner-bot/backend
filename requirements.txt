@@ -8,7 +8,7 @@ hikari==2.0.0.dev108
 python-dotenv>=0.19,<0.21
 sentry_sdk>=1.5,<1.6
 msgpack>=1,<1.1
-async-stripe>=2.74,<3
+async-stripe>=2.74,<4
 downdoom@git+https://github.com/cleaner-bot/downdoom.git
 async_commerce_coinbase@git+https://github.com/cleaner-bot/async-commerce-coinbase.git
 secretclient@git+ssh://git@github.com/cleaner-bot/secret-client
