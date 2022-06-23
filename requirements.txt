@@ -1,5 +1,5 @@
 fastapi>=0.68,<0.79
-uvicorn[standard]>=0.15,<0.18
+uvicorn[standard]>=0.15,<0.19
 pydantic>=1.9,<1.10
 coredis>=3.4,<3.11
 httpx>=0.16,<1
