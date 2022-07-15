@@ -1,4 +1,4 @@
-fastapi>=0.68,<0.79
+fastapi>=0.68,<0.80
 uvicorn[standard]>=0.15,<0.19
 pydantic>=1.9,<1.10
 coredis>=3.4,<3.12
