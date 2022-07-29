@@ -6,7 +6,7 @@ httpx>=0.16,<1
 python-jose>=3.3,<3.4
 hikari==2.0.0.dev109
 python-dotenv>=0.19,<0.21
-sentry_sdk>=1.5,<1.9
+sentry_sdk>=1.5,<1.10
 msgpack>=1,<1.1
 async-stripe>=2.74,<4
 downdoom@git+https://github.com/cleaner-bot/downdoom.git
