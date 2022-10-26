@@ -1,8 +1,5 @@
-import os
-from pathlib import Path
 
 from dotenv import load_dotenv
-from secretclient import request
 
 load_dotenv()
 
