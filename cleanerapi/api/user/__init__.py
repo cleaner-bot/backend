@@ -1,0 +1,15 @@
+from sanic import Blueprint, Request, text, HTTPResponse
+
+from ...helpers.auth import parse_user_token
+from . import guilds, info, mfa, statistics
+
+user_bp = Blueprint.group(guilds.bp, info.bp, mfa.bp, statistics.bp)
+
+
+@user_bp.middleware("request")
+async def authentication_middleware(request: Request) -> HTTPResponse | None:
+    database = request.app.ctx.database
+    request.ctx.user_token = user_token = await parse_user_token(request, database)
+    if user_token is None:
+        return text("Unauthorized", 401)
+    return None
