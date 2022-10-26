@@ -5,7 +5,7 @@ import typing
 
 import msgpack  # type: ignore
 from coredis import Redis
-from coredis.commands.pubsub import PubSubMessage
+from coredis.response.types import PubSubMessage
 from sanic.exceptions import SanicException
 
 RPCResponse = typing.TypedDict(

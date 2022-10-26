@@ -13,7 +13,7 @@ from webauthn import (
     verify_authentication_response,
     options_to_json,
 )
-from webauthn.helpers import bytes_to_base64url
+from webauthn.helpers.bytes_to_base64url import bytes_to_base64url
 from webauthn.helpers.structs import (
     AttestationConveyancePreference,
     PublicKeyCredentialDescriptor,

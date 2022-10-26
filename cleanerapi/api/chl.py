@@ -101,7 +101,7 @@ async def post_human_challenge(
             rnd = random.Random(svm_seed)
             svm_challenge = rnd.randbytes(4096)
             key = svm(svm_challenge)
-            parsed_token_bytes = typing.cast(bytes, parsed_token)  # type: ignore
+            parsed_token_bytes = typing.cast(bytes, parsed_token)
             raw_token = bytes(
                 x ^ key[i & 0xFF] for i, x in enumerate(parsed_token_bytes)
             )
