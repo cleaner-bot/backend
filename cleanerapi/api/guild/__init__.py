@@ -53,7 +53,7 @@ async def authentication_middleware(request: Request) -> HTTPResponse | None:
             "access_type": 0,  # owner
             "requires_mfa": True,
         }
-    else:
+    elif not matched_guild["requires_mfa"]:
         matched_guild["requires_mfa"] = await get_config_field(
             database, guild_id, "access_mfa"
         )
