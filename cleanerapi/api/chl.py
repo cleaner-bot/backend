@@ -233,7 +233,7 @@ async def check_verification(
     user_id, guild_id = parse_flow(request.app, flow)
 
     request.ctx.flow_data = flow_data = await database.hgetall(
-        f"verification:webcaptcha:{guild_id}-{user_id}"
+        f"verification:external:{guild_id}-{user_id}"
     )
     if not flow_data:
         return text("Already verified or link expired", 404)
@@ -254,7 +254,7 @@ async def complete_verification(
 
     result = await rpc_call(
         database,
-        "verification:webcaptcha:verify",
+        "verification:external:verify",
         user_id,
         guild_id,
         {k.decode(): v.decode() for k, v in request.ctx.flow_data.items()},
