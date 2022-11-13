@@ -45,7 +45,7 @@ default_config = {
     "antispam_anomaly_score": 30,
     "antiraid_enabled": False,
     "antiraid_limit": "5/30",
-    "antiraid_mode": 1,  # all/1day/3days/week
+    "antiraid_mode": 0,  # all/1day/3days/week
     "general_modroles": [],
     "slowmode_enabled": True,
     "slowmode_exceptions": [],
