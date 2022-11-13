@@ -32,8 +32,7 @@ async def authentication_middleware(request: Request) -> HTTPResponse | None:
     for guild in guilds:
         if guild["id"] == guild_id and (is_dev or guild["access_type"] >= 0):
             matched_guild = typing.cast(dict[str, str | bool | int], guild)
-            if guild["access_type"] < 0:
-                matched_guild["requires_mfa"] = True
+            matched_guild["requires_mfa"] = guild["access_type"] < 0
 
     if matched_guild is None:
         if not is_dev:
