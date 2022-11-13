@@ -210,7 +210,7 @@ async def complete_join_guard(
         f"user:{request.ctx.user_token.user_id}:oauth2", "token"
     )
     if token is None:
-        return text("token not found", 500)
+        return text("token not found", 409)
     result = await rpc_call(
         database,
         "joinguard",
@@ -219,7 +219,7 @@ async def complete_join_guard(
         token.decode(),
     )
     if not result["ok"]:
-        return text(result["message"], 500)
+        return text(result["message"], 409)
     return empty()
 
 
@@ -260,7 +260,7 @@ async def complete_verification(
         {k.decode(): v.decode() for k, v in request.ctx.flow_data.items()},
     )
     if not result["ok"]:
-        return text(result["message"], 500)
+        return text(result["message"], 409)
     return empty()
 
 
@@ -317,7 +317,7 @@ async def complete_super_verification(
         request.ctx.user_token.user_id,
     )
     if not result["ok"]:
-        return text(result["message"], 500)
+        return text(result["message"], 409)
     return empty()
 
 

@@ -39,5 +39,5 @@ async def post_verification_message(
         database, "verification:post-message", guild, int(body.channel_id)
     )
     if not response["ok"]:
-        return text(response["message"], 500)
+        return text(response["message"], 409)
     return empty()

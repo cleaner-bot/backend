@@ -224,7 +224,7 @@ async def post_bansync_import(
         banlist,
     )
     if not result["ok"]:
-        return text(result["message"], 500)
+        return text(result["message"], 409)
     return json(result["data"])
 
 
