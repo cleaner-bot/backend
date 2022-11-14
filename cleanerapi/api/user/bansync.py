@@ -51,7 +51,7 @@ async def get_user_me_banlists(
     return json(data)
 
 
-@bp.post("/user/me/bansync/banlist")
+@bp.post("/user/me/bansync")
 @openapi.summary("create a new banlist")
 @openapi.secured("user")
 @openapi.response(200, {"application/json"}, "Success")
