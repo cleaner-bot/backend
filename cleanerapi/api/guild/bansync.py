@@ -61,6 +61,40 @@ async def get_bansync_lists(
     return json(data)
 
 
+@bp.get("/guild/<guild:int>/bansync/<banlist:int>")
+@openapi.summary("returns a list of all your own ban lists")
+@openapi.secured("user")
+@openapi.response(200, {"application/json"}, "Success")
+@openapi.response(400, {"text/plain": str}, "Bad request")
+@openapi.response(401, {"text/plain": "Unauthorized"}, "Unauthorized")
+@openapi.response(403, {"text/plain": str}, "Forbidden")
+@openapi.response(404, {"text/plain": str}, "Guild not found")
+@openapi.response(500, {"text/plain": str}, "Internal error")
+@openapi.response(503, {"text/plain": str}, "Failed to connect to database")
+async def get_bansync_list(
+    request: Request, guild: int, banlist: int, database: Redis[bytes]
+) -> HTTPResponse:
+    name, owner, auto_sync, managers = await database.hmget(
+        f"bansync:banlist:{banlist}",
+        ("name", "owner", "auto_sync", "managers"),
+    )
+    if owner is None:
+        return text("Banlist not found", 404)
+    return json(
+        {
+            "id": str(banlist),
+            "name": name.decode() if name else UNTITLED_FALLBACK,
+            "count": await database.scard(f"bansync:banlist:{banlist}:users"),
+            "auto_sync": (
+                str(guild) in auto_sync.decode().split(",") if auto_sync else False
+            ),
+            "manager": (
+                str(guild) in (managers.decode().split(",") if managers else [])
+            ),
+        }
+    )
+
+
 @bp.patch("/guild/<guild:int>/bansync/<banlist:int>")
 @openapi.summary("patch ban list settings")
 @openapi.secured("user")
