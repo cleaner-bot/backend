@@ -1,9 +1,9 @@
 from sanic import Blueprint, HTTPResponse, Request, text
 
 from ...helpers.auth import parse_user_token
-from . import guilds, info, mfa, statistics
+from . import bansync, guilds, info, mfa, statistics
 
-user_bp = Blueprint.group(guilds.bp, info.bp, mfa.bp, statistics.bp)
+user_bp = Blueprint.group(bansync.bp, guilds.bp, info.bp, mfa.bp, statistics.bp)
 
 
 @user_bp.middleware("request")

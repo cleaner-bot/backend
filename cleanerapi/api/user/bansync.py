@@ -17,7 +17,7 @@ from ...helpers.bansync import (
 from ...helpers.settings import validate_snowflakes
 from ...helpers.snowflake import generate_snowflake
 
-bp = Blueprint("UserInfo", version=1)
+bp = Blueprint("UserBansync", version=1)
 
 
 @bp.get("/user/me/bansync/banlist")
