@@ -1,5 +1,5 @@
 from coredis.exceptions import ConnectionError
-from sanic import Request, HTTPResponse
+from sanic import HTTPResponse, Request
 from sanic.exceptions import SanicException
 from sanic.handlers import ErrorHandler
 

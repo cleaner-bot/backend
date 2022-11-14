@@ -1,11 +1,11 @@
 import os
+import typing
 from dataclasses import dataclass
 from urllib.parse import urlparse
-import typing
 
 import hikari
-from hikari.internal.time import utc_datetime
 from coredis import Redis
+from hikari.internal.time import utc_datetime
 from sanic import Blueprint, HTTPResponse, Request, json, text
 from sanic_ext import openapi, validate
 

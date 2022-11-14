@@ -1,11 +1,11 @@
 import typing
 
-from sanic import Blueprint, Request, text, HTTPResponse
+from sanic import Blueprint, HTTPResponse, Request, text
 
-from ...helpers.auth import get_user_guilds, parse_user_token, is_developer
+from ...helpers.auth import get_user_guilds, is_developer, parse_user_token
 from ...helpers.rpc import rpc_call
 from ...helpers.settings import get_config_field, get_entitlement_field
-from . import settings, verification, bansync, statistics, linkfilter
+from . import bansync, linkfilter, settings, statistics, verification
 
 guild_bp = Blueprint.group(
     bansync.bp, settings.bp, verification.bp, statistics.bp, linkfilter.bp

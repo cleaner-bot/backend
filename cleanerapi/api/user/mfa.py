@@ -7,24 +7,24 @@ from sanic import Blueprint, HTTPResponse, Request, text
 from sanic.response import empty
 from sanic_ext import openapi
 from webauthn import (
-    generate_registration_options,
-    verify_registration_response,
     generate_authentication_options,
-    verify_authentication_response,
+    generate_registration_options,
     options_to_json,
+    verify_authentication_response,
+    verify_registration_response,
 )
 from webauthn.helpers.bytes_to_base64url import bytes_to_base64url
-from webauthn.helpers.structs import (
-    AttestationConveyancePreference,
-    PublicKeyCredentialDescriptor,
-    AuthenticatorAssertionResponse,
-    AuthenticationCredential,
-    RegistrationCredential,
-    AuthenticatorAttestationResponse,
-)
 from webauthn.helpers.exceptions import (
     InvalidAuthenticationResponse,
     InvalidRegistrationResponse,
+)
+from webauthn.helpers.structs import (
+    AttestationConveyancePreference,
+    AuthenticationCredential,
+    AuthenticatorAssertionResponse,
+    AuthenticatorAttestationResponse,
+    PublicKeyCredentialDescriptor,
+    RegistrationCredential,
 )
 
 from ...helpers.auth import UserToken, create_user_token, get_user

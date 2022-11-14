@@ -7,17 +7,17 @@ from binascii import crc32
 
 from coredis import Redis
 from hikari import OAuth2Scope
-from sanic import Blueprint, HTTPResponse, Request, json, text, Sanic
+from sanic import Blueprint, HTTPResponse, Request, Sanic, json, text
 from sanic.exceptions import SanicException
 from sanic.response import empty
 from sanic_ext import openapi
 
-from ..helpers.auth import UserInfo, parse_user_token, get_user_guilds
+from ..helpers.auth import UserInfo, get_user_guilds, parse_user_token
 from ..helpers.based import b64parse
 from ..helpers.challenge_providers import verify_hcaptcha, verify_turnstile
+from ..helpers.fingerprint import fingerprint
 from ..helpers.rpc import rpc_call
 from ..helpers.settings import get_config_field, get_entitlement_field
-from ..helpers.fingerprint import fingerprint
 from ..helpers.svm import svm
 
 bp = Blueprint("HumanVerificationPlatform", "/chl", version=1)

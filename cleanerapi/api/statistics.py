@@ -3,7 +3,6 @@ from coredis import Redis
 from sanic import Blueprint, HTTPResponse, Request, json
 from sanic_ext import openapi
 
-
 bp = Blueprint("GlobalStatistics", version=1)
 
 

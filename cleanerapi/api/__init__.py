@@ -1,6 +1,6 @@
 from sanic import Blueprint
 
-from . import guild, oauth2, user, bansync, chl, statistics
+from . import bansync, chl, guild, oauth2, statistics, user
 
 api = Blueprint.group(
     bansync.bp,

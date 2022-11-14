@@ -1,4 +1,4 @@
-from sanic import Blueprint, Request, text, HTTPResponse
+from sanic import Blueprint, HTTPResponse, Request, text
 
 from ...helpers.auth import parse_user_token
 from . import guilds, info, mfa, statistics
