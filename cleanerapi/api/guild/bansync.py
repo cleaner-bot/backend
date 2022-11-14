@@ -35,19 +35,17 @@ async def get_bansync_lists(
     data: list[dict[str, list[str] | str | None | bool | int]] = []
     for raw_id in banlists:
         name, owner, auto_sync, managers = await database.hmget(
-            f"bansync:banlist:{raw_id.decode()}",
+            f"bansync:banlist:{raw_id}",
             ("name", "owner", "auto_sync", "managers"),
         )
         if owner is None:
-            data.append({"id": raw_id.decode(), "deleted": True})
+            data.append({"id": raw_id, "deleted": True})
         else:
             data.append(
                 {
-                    "id": raw_id.decode(),
+                    "id": raw_id,
                     "name": name.decode() if name else UNTITLED_FALLBACK,
-                    "count": await database.scard(
-                        f"bansync:banlist:{raw_id.decode()}:users"
-                    ),
+                    "count": await database.scard(f"bansync:banlist:{raw_id}:users"),
                     "auto_sync": (
                         str(guild) in auto_sync.decode().split(",")
                         if auto_sync
