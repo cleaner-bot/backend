@@ -26,7 +26,7 @@ default_config = {
     "rules_ping_broad_channels": [],
     "rules_advertisement_discord_invite": 1,
     "rules_advertisement_discord_invite_channels": [],
-    "rules_advertisement_discord_unsafeinvite": 1,
+    "rules_advertisement_discord_unsafeinvite": 2,
     "rules_advertisement_discord_unsafeinvite_channels": [],
     "rules_emoji_mass": 0,
     "rules_emoji_mass_channels": [],
