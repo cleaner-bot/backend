@@ -209,7 +209,7 @@ async def post_bansync_user_bans(
     return json(await add_users(database, banlist, ids))
 
 
-@bp.delete("/guild/<guild:int>/bansync/<banlist:int>/users", ignore_body=False)
+@bp.delete("/user/me/bansync/<banlist:int>/users", ignore_body=False)
 @openapi.summary("delete users from the banlist")
 @openapi.secured("user")
 @openapi.response(200, {"application/json"}, "Success")
