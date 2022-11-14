@@ -154,7 +154,7 @@ async def get_bansync_user_bans(
     managers = await database.hget(f"bansync:banlist:{banlist}", "managers")
     if managers is None or str(guild) not in managers.decode().split(","):
         return text("Banlist not found", 404)
-    return json(get_users(database, banlist))
+    return json(await get_users(database, banlist))
 
 
 @bp.post("/guild/<guild:int>/bansync/<banlist:int>/users")

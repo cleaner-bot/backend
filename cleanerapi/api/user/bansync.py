@@ -186,7 +186,7 @@ async def get_bansync_user_bans(
         f"user:{request.ctx.user_token.user_id}:bansync:banlist", banlist
     ):
         return text("Banlist not found", 404)
-    return json(get_users(database, banlist))
+    return json(await get_users(database, banlist))
 
 
 @bp.post("/user/me/bansync/<banlist:int>/users")
