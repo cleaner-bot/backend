@@ -113,8 +113,6 @@ default_entitlements = {
     "verification": 0,  # unused
     "super_verification": 0,  # unused
     "bansync_subscription_limit": 10,
-    "bansync_own_limit": 5,
-    "bansync_user_limit": 10_000,
     "auth": 1,
     "linkfilter": 0,
 }
