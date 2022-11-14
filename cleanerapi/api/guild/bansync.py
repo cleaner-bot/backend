@@ -138,6 +138,7 @@ async def patch_bansync_list(
             "name": name.decode() if name else UNTITLED_FALLBACK,
             "count": await database.scard(f"bansync:banlist:{banlist}:users"),
             "auto_sync": str(guild) in sync_set,
+            "manager": True,
         }
     )
 
