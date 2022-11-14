@@ -13,7 +13,7 @@ from ...helpers.bansync import (
     remove_users,
 )
 from ...helpers.rpc import rpc_call
-from ...helpers.settings import validate_boolean, get_config_field
+from ...helpers.settings import get_config_field, validate_boolean
 
 bp = Blueprint("BanSync", version=1)
 

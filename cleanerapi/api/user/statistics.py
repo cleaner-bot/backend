@@ -38,7 +38,7 @@ async def get_user_me_statistics(
     if not guild_ids:
         return json(None)
 
-    statistics: None | dict = None
+    statistics: None | dict[str, dict[str, dict[str, dict[str, int]]]] = None
     for guild in guild_ids:
         stats = await database.get(f"guild:{guild}:statistics")
         if stats is None:

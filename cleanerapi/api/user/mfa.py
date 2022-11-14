@@ -6,18 +6,18 @@ from coredis import Redis
 from sanic import Blueprint, HTTPResponse, Request, text
 from sanic.response import empty
 from sanic_ext import openapi
-from webauthn import (
+from webauthn.authentication.generate_authentication_options import (
     generate_authentication_options,
-    generate_registration_options,
-    options_to_json,
+)
+from webauthn.authentication.verify_authentication_response import (
     verify_authentication_response,
-    verify_registration_response,
 )
 from webauthn.helpers.bytes_to_base64url import bytes_to_base64url
 from webauthn.helpers.exceptions import (
     InvalidAuthenticationResponse,
     InvalidRegistrationResponse,
 )
+from webauthn.helpers.options_to_json import options_to_json
 from webauthn.helpers.structs import (
     AttestationConveyancePreference,
     AuthenticationCredential,
@@ -25,6 +25,12 @@ from webauthn.helpers.structs import (
     AuthenticatorAttestationResponse,
     PublicKeyCredentialDescriptor,
     RegistrationCredential,
+)
+from webauthn.registration.generate_registration_options import (
+    generate_registration_options,
+)
+from webauthn.registration.verify_registration_response import (
+    verify_registration_response,
 )
 
 from ...helpers.auth import UserToken, create_user_token, get_user
@@ -281,6 +287,8 @@ async def post_authentication_u2f_mfa(
         return text("U2F not allowed", 403)
     elif challenge is None or challenge == b"" or sign_count is None:
         return text("No attestation expected", 404)
+
+    assert credential_public_key
 
     body = request.json
     credential = AuthenticationCredential(

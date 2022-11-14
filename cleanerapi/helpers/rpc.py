@@ -51,7 +51,7 @@ async def rpc_agent(database: Redis[bytes]) -> None:
         message = await pubsub.get_message()
         if message is None or message["type"] != "pmessage":
             continue
-        call_id = message["channel"].decode().split(":")[-1]
+        call_id = message["channel"].decode().split(":")[-1]  # type: ignore
         call = _calls.get(call_id, None)
         if call is not None:
             await call.put(message)

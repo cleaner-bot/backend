@@ -130,7 +130,7 @@ def validate_snowflakes(x: list[str] | typing.Any) -> bool:
     return isinstance(x, list) and all(map(validate_snowflake, x)) and 250 >= len(x)
 
 
-def validate_boolean(x: bool | typing.Any):
+def validate_boolean(x: bool | typing.Any) -> bool:
     return x in (True, False)
 
 
