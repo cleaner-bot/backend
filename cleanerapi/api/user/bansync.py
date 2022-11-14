@@ -30,7 +30,7 @@ async def get_user_me_banlists(
     request: Request, database: Redis[bytes]
 ) -> HTTPResponse:
     banlists = await database.smembers(
-        f"user:{request.ctx.user_token.user_id}:bansync:banlists"
+        f"user:{request.ctx.user_token.user_id}:bansync:banlist"
     )
     data = []
     for raw_id in banlists:
@@ -61,7 +61,7 @@ async def get_user_me_banlists(
 @openapi.response(503, {"text/plain": str}, "Failed to connect to database")
 async def create_bansync_list(request: Request, database: Redis[bytes]) -> HTTPResponse:
     if (
-        await database.scard(f"user:{request.ctx.user_token.user_id}:bansync:lists")
+        await database.scard(f"user:{request.ctx.user_token.user_id}:bansync:banlist")
         >= BANLIST_LIMIT
     ):
         return text("Bansync list limit reached", 400)
@@ -74,7 +74,7 @@ async def create_bansync_list(request: Request, database: Redis[bytes]) -> HTTPR
         },
     )
     await database.sadd(
-        f"user:{request.ctx.user_token.user_id}:bansync:lists", (list_id,)
+        f"user:{request.ctx.user_token.user_id}:bansync:banlist", (list_id,)
     )
 
     return json(
@@ -100,7 +100,7 @@ async def delete_bansync_list(
     request: Request, banlist: int, database: Redis[bytes]
 ) -> HTTPResponse:
     if not await database.srem(
-        f"user:{request.ctx.user_token.user_id}:bansync:lists", (banlist,)
+        f"user:{request.ctx.user_token.user_id}:bansync:banlist", (banlist,)
     ):
         return text("Banlist not found", 404)
 
@@ -122,7 +122,7 @@ async def patch_bansync_list(
     request: Request, banlist: int, database: Redis[bytes]
 ) -> HTTPResponse:
     if not await database.sismember(
-        f"user:{request.ctx.user_token.user_id}:bansync:lists", banlist
+        f"user:{request.ctx.user_token.user_id}:bansync:banlist", banlist
     ):
         return text("Banlist not found", 404)
 
@@ -183,7 +183,7 @@ async def get_bansync_user_bans(
     request: Request, banlist: int, database: Redis[bytes]
 ) -> HTTPResponse:
     if not await database.sismember(
-        f"user:{request.ctx.user_token.user_id}:bansync:lists", banlist
+        f"user:{request.ctx.user_token.user_id}:bansync:banlist", banlist
     ):
         return text("Banlist not found", 404)
     return json(get_users(database, banlist))
@@ -202,7 +202,7 @@ async def post_bansync_user_bans(
     request: Request, banlist: int, database: Redis[bytes]
 ) -> HTTPResponse:
     if not await database.sismember(
-        f"user:{request.ctx.user_token.user_id}:bansync:lists", banlist
+        f"user:{request.ctx.user_token.user_id}:bansync:banlist", banlist
     ):
         return text("Banlist not found", 404)
     ids = typing.cast(list[str], request.json)
@@ -222,7 +222,7 @@ async def delete_bansync_user_bans(
     request: Request, banlist: int, database: Redis[bytes]
 ) -> HTTPResponse:
     if not await database.sismember(
-        f"user:{request.ctx.user_token.user_id}:bansync:lists", banlist
+        f"user:{request.ctx.user_token.user_id}:bansync:banlist", banlist
     ):
         return text("Banlist not found", 404)
     ids = typing.cast(list[str], request.json)
@@ -242,7 +242,7 @@ async def put_bansync_user_bans(
     request: Request, banlist: int, database: Redis[bytes]
 ) -> HTTPResponse:
     if not await database.sismember(
-        f"user:{request.ctx.user_token.user_id}:bansync:lists", banlist
+        f"user:{request.ctx.user_token.user_id}:bansync:banlist", banlist
     ):
         return text("Banlist not found", 404)
     ids = typing.cast(list[str], request.json)
