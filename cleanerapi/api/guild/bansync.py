@@ -34,23 +34,30 @@ async def get_bansync_lists(
     banlists = await get_config_field(database, guild, "bansync_subscribed")
     data: list[dict[str, list[str] | str | None | bool | int]] = []
     for raw_id in banlists:
-        name, auto_sync, managers = await database.hmget(
-            f"bansync:banlist:{raw_id.decode()}", ("name", "auto_sync", "managers")
+        name, owner, auto_sync, managers = await database.hmget(
+            f"bansync:banlist:{raw_id.decode()}",
+            ("name", "owner", "auto_sync", "managers"),
         )
-        data.append(
-            {
-                "id": raw_id.decode(),
-                "name": name.decode() if name else UNTITLED_FALLBACK,
-                "count": await database.scard(
-                    f"bansync:banlist:{raw_id.decode()}:users"
-                ),
-                "auto_sync": (
-                    str(guild) in auto_sync.decode().split(",") if auto_sync else False
-                ),
-                "manager": str(guild)
-                in (managers.decode().split(",") if managers else []),
-            }
-        )
+        if owner is None:
+            data.append({"id": raw_id.decode(), "deleted": True})
+        else:
+            data.append(
+                {
+                    "id": raw_id.decode(),
+                    "name": name.decode() if name else UNTITLED_FALLBACK,
+                    "count": await database.scard(
+                        f"bansync:banlist:{raw_id.decode()}:users"
+                    ),
+                    "auto_sync": (
+                        str(guild) in auto_sync.decode().split(",")
+                        if auto_sync
+                        else False
+                    ),
+                    "manager": (
+                        str(guild) in (managers.decode().split(",") if managers else [])
+                    ),
+                }
+            )
     return json(data)
 
 
