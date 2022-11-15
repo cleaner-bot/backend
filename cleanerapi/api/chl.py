@@ -1,9 +1,10 @@
-import base64
 import hmac
 import os
 import random
 import typing
+from base64 import b64encode, urlsafe_b64decode
 from binascii import crc32
+from datetime import datetime
 
 from coredis import Redis
 from hikari import OAuth2Scope
@@ -55,93 +56,25 @@ async def post_human_challenge(
     elif "type" not in payload:
         return text("Missing 'type' in body.payload", 400)
 
-    result: HTTPResponse | str | bool = False
+    result: HTTPResponse | list[str] | bool = False
     if payload["type"] == "j":  # joinguard
-        result = await check_join_guard(request, database, payload)
+        result, unique = await check_join_guard(request, database, payload)
     elif payload["type"] == "v":  # verification
-        result = await check_verification(request, database, payload)
+        result, unique = await check_verification(request, database, payload)
     elif payload["type"] == "sv":  # super verificaiton
-        result = await check_super_verification(request, database, payload)
+        result, unique = await check_super_verification(request, database, payload)
     else:
         return text("Invalid 'type' in body.payload", 400)
 
     if isinstance(result, HTTPResponse):
-        return result
+        return result  # bad request
 
     if result:
         if isinstance(result, bool):
-            result = "turnstile"
-
-        request_fingerprint = fingerprint(request, result + "-" + payload["type"])
-        chldata: dict[str, str] | None = body.get("chldata")
-        is_valid = True
-        if (
-            chldata is None
-            or chldata.get("token", "") == ""
-            or (parsed_token := b64parse(chldata["token"])) is None
-            or chldata.get("ticket", "") == ""
-            or (parsed_ticket := b64parse(chldata["ticket"])) is None
-            or result != chldata.get("type")
-            or len(parsed_ticket) != 96
-            or not hmac.compare_digest(parsed_ticket[:32], request_fingerprint)
-            or not hmac.compare_digest(
-                hmac.digest(
-                    bytes.fromhex(request.app.config.BACKEND_AUTH_SECRET),
-                    parsed_ticket[:-32],
-                    "sha256",
-                ),
-                parsed_ticket[-32:],
-            )
-        ):
-            is_valid = False
-
-        if is_valid:
-            assert chldata is not None  # redundant, but mypy :/
-            svm_seed = parsed_ticket[32:64]  # type: ignore
-            rnd = random.Random(svm_seed)
-            svm_challenge = rnd.randbytes(4096)
-            key = svm(svm_challenge)
-            parsed_token_bytes = typing.cast(bytes, parsed_token)
-            raw_token = bytes(
-                x ^ key[i & 0xFF] for i, x in enumerate(parsed_token_bytes)
-            )
-            if (
-                crc32(bytes(x ^ 0xFF for x in raw_token[:-4])).to_bytes(
-                    4, "big", signed=False
-                )
-                != parsed_token_bytes[-4:]
-            ):
-                is_valid = False
-            elif result == "hcaptcha":
-                token = raw_token[:-4].decode()
-                is_valid = await verify_hcaptcha(request.app, token, request.ip)
-            elif result == "turnstile":
-                token = raw_token[:-4].decode()
-                cdata = parsed_ticket.hex()  # type: ignore
-                is_valid = await verify_turnstile(request.app, token, request.ip, cdata)
-
-        if not is_valid:
-            svm_seed = os.urandom(32)
-            raw_ticket = request_fingerprint + svm_seed
-            raw_ticket += hmac.digest(
-                bytes.fromhex(request.app.config.BACKEND_AUTH_SECRET),
-                raw_ticket,
-                "sha256",
-            )
-            rnd = random.Random(svm_seed)
-            svm_challenge = rnd.randbytes(4096)
-            cdata = {
-                "type": result,
-                "ticket": base64.b64encode(raw_ticket).decode(),
-                "svm": base64.b64encode(svm_challenge).decode().strip("="),
-            }
-            if result == "hcaptcha":
-                cdata["sitekey"] = request.app.config.HCAPTCHA_SITEKEY
-            elif result == "turnstile":
-                cdata["sitekey"] = request.app.config.TURNSTILE_SITEKEY
-                cdata["action"] = payload["type"]
-                cdata["cdata"] = raw_ticket.hex()
-            return json(cdata, 403)
+            result = ["turnstile"]
+        assert unique is not None
+        if r := await verify(request, result, body.get("chldata"), unique):
+            return r
 
     if payload["type"] == "j":  # joinguard
         result = await complete_join_guard(request, database, payload)
@@ -156,34 +89,132 @@ async def post_human_challenge(
     return empty()
 
 
+async def verify(
+    request: Request, captcha_providers: list[str], body: typing.Any, unique: str
+) -> HTTPResponse | None:
+    timestamp = int(datetime.now().timestamp() * 1000)
+    request_fingerprint = fingerprint(request, "chl")
+    provider_index = 0
+    if (
+        isinstance(body, dict)
+        and body.get("s1", "") != ""
+        and (chl_svm_seed := b64parse(body["s1"])) is not None
+        and body.get("h", "") != ""
+        and (chl_signature := b64parse(body["h"])) is not None
+        and body.get("token", "") != ""
+        and (chl_token := b64parse(body["token"])) is not None
+        and isinstance(body.get("i", ""), int)
+        and isinstance(body.get("t", ""), int)
+    ):
+        expected_signature = hmac.new(
+            request.app.config.BACKEND_AUTH_SECRET,
+            unique.encode()
+            + body["i"].to_bytes(4, "big")
+            + body["t"].to_bytes(8, "big")
+            + request_fingerprint
+            + chl_svm_seed
+            + request_fingerprint,
+            "sha256",
+        ).digest()
+        if hmac.compare_digest(expected_signature, chl_signature):
+            rnd = random.Random(chl_svm_seed)
+            svm_challenge = rnd.randbytes(4096)
+            key = svm(svm_challenge)
+            raw_token = bytes(x ^ key[i & 0xFF] for i, x in enumerate(chl_token))
+            challenge_provider = captcha_providers[body["i"]]
+            if (
+                crc32(bytes(x ^ 0xFF for x in raw_token[:-4])).to_bytes(
+                    4, "big", signed=False
+                )
+                != chl_token[-4:]
+            ):
+                pass
+
+            elif body["i"] < timestamp - 300_000:
+                provider_index = body["i"]
+
+            elif challenge_provider == "hcaptcha":
+                token = raw_token[:-4].decode()
+                if await verify_hcaptcha(request.app, token, request.ip):
+                    provider_index = body["i"] + 1
+
+            elif challenge_provider == "turnstile":
+                token = raw_token[:-4].decode()
+                if await verify_turnstile(request.app, token, request.ip, body["h"]):
+                    provider_index = body["i"] + 1
+
+    if provider_index >= len(captcha_providers):
+        return None
+
+    svm_seed = os.urandom(32)
+    rnd = random.Random(svm_seed)
+    svm_challenge = rnd.randbytes(4096)
+    signature = hmac.new(
+        request.app.config.BACKEND_AUTH_SECRET,
+        unique.encode()
+        + provider_index.to_bytes(4, "big")
+        + timestamp.to_bytes(8, "big")
+        + request_fingerprint
+        + svm_seed
+        + request_fingerprint,
+        "sha256",
+    ).digest()
+
+    challenge_provider = captcha_providers[provider_index]
+    challenge: dict[str, dict[str, str | int]] = {
+        "captcha": {"provider": challenge_provider},
+        "d": {
+            # "fp": request_fingerprint.hex(),
+            "svm": b64encode(svm_challenge).decode(),
+            "s1": b64encode(svm_seed).decode(),
+            "h": b64encode(signature).decode(),
+            "i": provider_index,
+            "t": timestamp,
+        },
+    }
+
+    if challenge_provider == "turnstile":
+        challenge["captcha"].update(
+            {
+                "sitekey": request.app.config.TURNSTILE_SITEKEY,
+                "action": unique.split("|")[0],
+                "cdata": b64encode(signature).decode(),
+            }
+        )
+    elif challenge_provider == "hcaptcha":
+        challenge["captcha"]["sitekey"] = request.app.config.HCAPTCHA_SITEKEY
+
+    return json(challenge)
+
+
 async def check_join_guard(
     request: Request, database: Redis[bytes], payload: dict[str, str]
-) -> HTTPResponse | bool | str:
+) -> tuple[HTTPResponse | bool | list[str], str]:
     guild = payload.get("guild")
     if guild is None:
-        return text("Missing 'guild' in body.payload")
+        return text("Missing 'guild' in body.payload"), ""
     elif not guild.isdigit():
-        return text("Not an integer: body.payload.guild", 400)
+        return text("Not an integer: body.payload.guild", 400), ""
 
     request.ctx.user_token = user_token = await parse_user_token(request, database)
     if user_token is None:
-        return text("Unauthorized", 401)
+        return text("Unauthorized", 401), ""
 
     if not await get_config_field(database, guild, "joinguard_enabled"):
-        return text("Join Guard is not enabled", 409)
+        return text("Join Guard is not enabled", 409), ""
     plan = await get_entitlement_field(database, guild, "plan")
     joinguard = await get_entitlement_field(database, guild, "joinguard")
     if plan < joinguard:
-        return text("Join Guard is not enabled", 409)
+        return text("Join Guard is not enabled", 409), ""
 
     tempbanned = await database.get(f"guild:{guild}:joinguard:{user_token.user_id}")
     if tempbanned is not None:
-        return text(tempbanned.decode(), 400)
+        return text(tempbanned.decode(), 400), ""
 
     guilds = await get_user_guilds(request, database)
 
     if any(x["id"] == guild for x in guilds):
-        return text("Already verified", 404)
+        return text("Already verified", 404), ""
 
     token, scopes = await database.hmget(
         f"user:{user_token.user_id}:oauth2", ("token", "scopes")
@@ -193,14 +224,14 @@ async def check_join_guard(
         or scopes is None
         or OAuth2Scope.GUILDS_JOIN not in scopes.decode().split(" ")
     ):
-        return text("Missing required scope", 401)
+        return text("Missing required scope", 401), ""
 
     if await database.scard(f"guild:{guild}:joinguard") >= 20:
-        return "hcaptcha"
+        return ["hcaptcha"], f"j|{guild}"
     elif await get_config_field(database, guild, "joinguard_captcha"):
-        return True
+        return True, f"j|{guild}"
 
-    return False
+    return False, ""
 
 
 async def complete_join_guard(
@@ -225,10 +256,10 @@ async def complete_join_guard(
 
 async def check_verification(
     request: Request, database: Redis[bytes], payload: dict[str, str]
-) -> HTTPResponse | bool | str:
+) -> tuple[HTTPResponse | bool | list[str], str]:
     flow = payload.get("flow")
     if flow is None:
-        return text("Missing 'flow' in body.payload")
+        return text("Missing 'flow' in body.payload"), ""
 
     user_id, guild_id = parse_flow(request.app, flow)
 
@@ -236,15 +267,15 @@ async def check_verification(
         f"verification:external:{guild_id}-{user_id}"
     )
     if not flow_data:
-        return text("Already verified or link expired", 404)
+        return text("Already verified or link expired", 404), ""
 
     exists = await rpc_call(database, "dash:guild-check", (guild_id,))
     if not exists["ok"] or not exists["data"]:
-        return text("Guild not found", 404)
+        return text("Guild not found", 404), ""
     elif not await get_config_field(database, guild_id, "verification_enabled"):
-        return text("Guild does not have verification enabled", 409)
+        return text("Guild does not have verification enabled", 409), ""
 
-    return True
+    return True, f"|v{user_id}|{guild_id}"
 
 
 async def complete_verification(
@@ -266,45 +297,48 @@ async def complete_verification(
 
 async def check_super_verification(
     request: Request, database: Redis[bytes], payload: dict[str, str]
-) -> HTTPResponse | bool | str:
+) -> tuple[HTTPResponse | bool | list[str], str]:
     guild = payload.get("guild")
     if guild is None:
-        return text("Missing 'guild' in body.payload")
+        return text("Missing 'guild' in body.payload"), ""
     elif not guild.isdigit():
-        return text("Not an integer: body.payload.guild", 400)
+        return text("Not an integer: body.payload.guild", 400), ""
 
     request.ctx.user_token = user_token = await parse_user_token(request, database)
     if user_token is None:
-        return text("Unauthorized", 401)
+        return text("Unauthorized", 401), ""
 
     if not await get_config_field(database, guild, "super_verification_enabled"):
-        return text("Super Verification is not enabled", 409)
+        return text("Super Verification is not enabled", 409), ""
 
     plan = await get_entitlement_field(database, guild, "plan")
     super_verification = await get_entitlement_field(
         database, guild, "super_verification"
     )
     if plan < super_verification:
-        return text("Super Verification is not enabled", 409)
+        return text("Super Verification is not enabled", 409), ""
 
     guilds = await get_user_guilds(request, database)
 
     if all(x["id"] != guild for x in guilds):
-        return text("User not in guild", 404)
+        return text("User not in guild", 404), ""
 
     jointime = await database.hget(
         f"guild:{guild}:super-verification", str(user_token.user_id)
     )
     if jointime is None:
-        return text("Already verified", 404)
+        return text("Already verified", 404), ""
 
-    if await database.hlen(f"guild:{guild}:super-verification") >= 20:
-        return "hcaptcha"
+    danger = await database.hlen(f"guild:{guild}:super-verification")
+    if danger >= 20:
+        return ["hcaptcha"], f"sv{user_token.user_id}|{guild}"
+    elif danger >= 10:
+        return True, f"sv|{user_token.user_id}|{guild}"
 
     if await get_config_field(database, guild, "super_verification_captcha"):
-        return True
+        return True, f"sv|{user_token.user_id}|{guild}"
 
-    return False
+    return False, ""
 
 
 async def complete_super_verification(
@@ -323,7 +357,7 @@ async def complete_super_verification(
 
 def parse_flow(app: Sanic, flow: str) -> tuple[int, int]:
     try:
-        raw = base64.urlsafe_b64decode(flow + "=" * (len(flow) % 4))
+        raw = urlsafe_b64decode(flow + "=" * (len(flow) % 4))
     except ValueError:
         raise SanicException("body.payload.flow is not base64 encoded", 400)
 
