@@ -168,7 +168,7 @@ async def verify(
         "captcha": {"provider": challenge_provider},
         "d": {
             # "fp": request_fingerprint.hex(),
-            "svm": b64encode(svm_challenge).decode(),
+            "svm": b64encode(svm_challenge).decode().strip("="),
             "s1": b64encode(svm_seed).decode(),
             "h": b64encode(signature).decode(),
             "i": provider_index,
