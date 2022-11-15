@@ -8,6 +8,7 @@ from datetime import datetime
 
 from coredis import Redis
 from hikari import OAuth2Scope
+from httpx import AsyncClient
 from sanic import Blueprint, HTTPResponse, Request, Sanic, json, text
 from sanic.exceptions import SanicException
 from sanic.response import empty
@@ -45,7 +46,7 @@ class VerificationResponse:
     503, {"text/plain": str}, "Failed to connect to database or backend server"
 )
 async def post_human_challenge(
-    request: Request, database: Redis[bytes]
+    request: Request, client: AsyncClient, database: Redis[bytes]
 ) -> HTTPResponse:
     body = request.json
 
@@ -71,8 +72,10 @@ async def post_human_challenge(
 
     if result:
         if isinstance(result, bool):
-            result = ["turnstile"] * 5
+            result = ["turnstile"]
         assert unique is not None
+        if await is_proxy(request, client, database):
+            result.append("hcaptcha")
         if r := await verify(request, result, body.get("chldata"), unique):
             return r
 
@@ -185,6 +188,28 @@ async def verify(
         challenge["captcha"]["sitekey"] = request.app.config.HCAPTCHA_SITEKEY
 
     return json(challenge, 403)
+
+
+async def is_proxy(
+    request: Request, client: AsyncClient, database: Redis[bytes]
+) -> bool:
+    cached = await database.get(f"cache:ip:{request.ip}")
+    if cached is not None:
+        return cached == b"1"
+    asn = typing.cast(str, request.headers["X-Connecting-Asn"])
+    if await database.sismember("cache:hosting-asn", asn):
+        return True
+    response = await client.get(
+        f"https://ip-api.com/json/{request.ip}?fields=status,mobile,proxy,hosting"
+    )
+    response.raise_for_status()
+    data = response.json()
+    print("ipcheck", data)
+    is_proxy = data["proxy"] or data["hosting"]
+    if data["hosting"]:
+        await database.sadd("cache:hosting-asn", (asn,))
+    await database.set(f"cache:ip:{request.ip}", "1" if is_proxy else "0", ex=60 * 60)
+    return bool(is_proxy)
 
 
 async def check_join_guard(
