@@ -139,7 +139,9 @@ async def verify(
 
             elif challenge_provider == "turnstile":
                 token = raw_token[:-4].decode()
-                if await verify_turnstile(request.app, token, request.ip, body["h"]):
+                if await verify_turnstile(
+                    request.app, token, request.ip, chl_signature.hex()
+                ):
                     provider_index = body["i"] + 1
 
     if provider_index >= len(captcha_providers):
@@ -176,7 +178,7 @@ async def verify(
             {
                 "sitekey": request.app.config.TURNSTILE_SITEKEY,
                 "action": unique.split("|")[0],
-                "cdata": b64encode(signature).decode(),
+                "cdata": signature.hex(),
             }
         )
     elif challenge_provider == "hcaptcha":
