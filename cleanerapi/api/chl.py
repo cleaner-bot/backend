@@ -182,7 +182,7 @@ async def verify(
     elif challenge_provider == "hcaptcha":
         challenge["captcha"]["sitekey"] = request.app.config.HCAPTCHA_SITEKEY
 
-    return json(challenge)
+    return json(challenge, 403)
 
 
 async def check_join_guard(
