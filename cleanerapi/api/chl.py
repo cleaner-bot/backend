@@ -71,7 +71,7 @@ async def post_human_challenge(
 
     if result:
         if isinstance(result, bool):
-            result = ["turnstile"]
+            result = ["turnstile"] * 5
         assert unique is not None
         if r := await verify(request, result, body.get("chldata"), unique):
             return r
