@@ -95,6 +95,8 @@ async def verify(
     timestamp = int(datetime.now().timestamp() * 1000)
     request_fingerprint = fingerprint(request, "chl")
     provider_index = 0
+    print(captcha_providers, unique)
+    print(body)
     if (
         isinstance(body, dict)
         and body.get("s1", "") != ""
@@ -115,6 +117,7 @@ async def verify(
             + chl_svm_seed,
             "sha256",
         ).digest()
+        print(chl_signature.hex(), expected_signature.hex())
         if hmac.compare_digest(expected_signature, chl_signature):
             rnd = random.Random(chl_svm_seed)
             svm_challenge = rnd.randbytes(4096)
