@@ -199,8 +199,9 @@ async def is_proxy(
     asn = typing.cast(str, request.headers["X-Connecting-Asn"])
     if await database.sismember("cache:hosting-asn", asn):
         return True
+    # cannot use https without paying, wtf?
     response = await client.get(
-        f"https://ip-api.com/json/{request.ip}?fields=status,mobile,proxy,hosting"
+        f"http://ip-api.com/json/{request.ip}?fields=status,mobile,proxy,hosting"
     )
     response.raise_for_status()
     data = response.json()
