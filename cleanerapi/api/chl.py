@@ -121,6 +121,7 @@ async def verify(
             key = svm(svm_challenge)
             raw_token = bytes(x ^ key[i & 0xFF] for i, x in enumerate(chl_token))
             print(raw_token, raw_token.hex(), chl_token[-4:].hex())
+            print(list(key))
             challenge_provider = captcha_providers[body["i"]]
             if (
                 crc32(bytes(x ^ 0xFF for x in raw_token[:-4])).to_bytes(
