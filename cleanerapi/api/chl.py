@@ -127,10 +127,11 @@ async def verify(
                 )
                 != chl_token[-4:]
             ):
-                pass
+                print("failed crc32 checksum")
 
             elif body["t"] < timestamp - 300_000:
                 provider_index = body["t"]
+                print("timeout", body, timestamp)
 
             elif challenge_provider == "hcaptcha":
                 token = raw_token[:-4].decode()
