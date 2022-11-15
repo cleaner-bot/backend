@@ -18,6 +18,7 @@ def fingerprint(request: Request, seed: str) -> bytes:
         "sec-fetch-dest",
         "sec-fetch-mode",
         "sec-fetch-site",
+        "user-agent",
     ):
         all_values: list[str] = headers.getall(header, [])
         genes.append(str(len(all_values)))
