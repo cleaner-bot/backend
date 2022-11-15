@@ -273,7 +273,7 @@ async def check_verification(
     elif not await get_config_field(database, guild_id, "verification_enabled"):
         return text("Guild does not have verification enabled", 409), ""
 
-    return True, f"|v{user_id}|{guild_id}"
+    return True, f"v|{user_id}|{guild_id}"
 
 
 async def complete_verification(
