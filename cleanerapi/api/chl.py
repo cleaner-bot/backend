@@ -107,13 +107,12 @@ async def verify(
         and isinstance(body.get("t", ""), int)
     ):
         expected_signature = hmac.new(
-            request.app.config.BACKEND_AUTH_SECRET,
+            bytes.fromhex(request.app.config.BACKEND_AUTH_SECRET),
             unique.encode()
             + body["i"].to_bytes(4, "big")
             + body["t"].to_bytes(8, "big")
             + request_fingerprint
-            + chl_svm_seed
-            + request_fingerprint,
+            + chl_svm_seed,
             "sha256",
         ).digest()
         if hmac.compare_digest(expected_signature, chl_signature):
@@ -150,13 +149,12 @@ async def verify(
     rnd = random.Random(svm_seed)
     svm_challenge = rnd.randbytes(4096)
     signature = hmac.new(
-        request.app.config.BACKEND_AUTH_SECRET,
+        bytes.fromhex(request.app.config.BACKEND_AUTH_SECRET),
         unique.encode()
         + provider_index.to_bytes(4, "big")
         + timestamp.to_bytes(8, "big")
         + request_fingerprint
-        + svm_seed
-        + request_fingerprint,
+        + svm_seed,
         "sha256",
     ).digest()
 
