@@ -240,7 +240,7 @@ async def check_join_guard(
     guilds = await get_user_guilds(request, database)
 
     if any(x["id"] == guild for x in guilds):
-        return text("Already verified", 404), ""
+        return text("Already joined", 404), ""
 
     token, scopes = await database.hmget(
         f"user:{user_token.user_id}:oauth2", ("token", "scopes")
