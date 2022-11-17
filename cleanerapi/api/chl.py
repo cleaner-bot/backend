@@ -50,7 +50,7 @@ async def post_human_challenge(
 ) -> HTTPResponse:
     body = request.json
 
-    payload: dict[str, str] = body.get("payload")
+    payload: dict[str, str] = body.get("p")
 
     if payload is None:
         return text("Missing 'payload' in body", 400)
@@ -62,7 +62,7 @@ async def post_human_challenge(
         result, unique = await check_join_guard(request, database, payload)
     elif payload["type"] == "v":  # verification
         result, unique = await check_verification(request, database, payload)
-    elif payload["type"] == "sv":  # super verificaiton
+    elif payload["type"] == "sv":  # super verification
         result, unique = await check_super_verification(request, database, payload)
     else:
         return text("Invalid 'type' in body.payload", 400)
@@ -76,7 +76,7 @@ async def post_human_challenge(
         assert unique is not None
         if await is_proxy(request, client, database):
             result.append("hcaptcha")
-        if r := await verify(request, result, body.get("chldata"), unique):
+        if r := await verify(request, result, body.get("c"), unique):
             return r
 
     if payload["type"] == "j":  # joinguard
