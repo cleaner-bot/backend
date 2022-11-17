@@ -250,6 +250,7 @@ def browser_check(request: Request, browserdata: BrowserData) -> bool:
     base_seed[3] ^= browserdata["s"] & 0xFF
 
     key = crc32(bytes([x ^ 181 for x in base_seed])).to_bytes(4, "big")
+    print(int.from_bytes(key, "big"), key, base_seed, list(base_seed))
     decoded = b64parse(browserdata["m1"])
     if decoded is None:
         print("m1 is not valid base64", browserdata)
