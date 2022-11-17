@@ -213,8 +213,9 @@ async def verify(
 
 def browser_check(request: Request, browserdata: BrowserData) -> bool:
     # check if payload makes sense
-    browserdata_shape = {key: type(value) for key, value in browserdata.items()}
-    if browserdata_shape != BrowserData.__annotations__:
+    browserdata_shape = {k: typing.ForwardRef(type(v).__name__) for k, v in browserdata.items()}
+    # using a string compare cuz everything else just does not work
+    if str(browserdata_shape) != str(BrowserData.__annotations__):
         print("shape of browserdata does not match", browserdata_shape, browserdata)
         return False
 
