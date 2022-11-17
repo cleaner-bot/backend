@@ -1,3 +1,6 @@
+from __future__ import annotations
+
+import enum
 import hmac
 import os
 import random
@@ -25,6 +28,12 @@ from ..helpers.svm import svm
 bp = Blueprint("HumanVerificationPlatform", "/chl", version=1)
 
 
+class RequiredCaptchaType(enum.Enum):
+    DEFAULT = enum.auto()
+    CAPTCHA = enum.auto()
+    RAID = enum.auto()
+
+
 class VerificationResponse:
     user: UserInfo | None
     is_valid: bool
@@ -50,6 +59,7 @@ async def post_human_challenge(
 ) -> HTTPResponse:
     body = request.json
 
+    browserdata: dict[str, str | int] = body.get("d")
     payload: dict[str, str] = body.get("p")
 
     if payload is None:
@@ -57,7 +67,7 @@ async def post_human_challenge(
     elif "type" not in payload:
         return text("Missing 'type' in body.payload", 400)
 
-    result: HTTPResponse | list[str] | bool = False
+    result: HTTPResponse | RequiredCaptchaType
     if payload["type"] == "j":  # joinguard
         result, unique = await check_join_guard(request, database, payload)
     elif payload["type"] == "v":  # verification
@@ -69,15 +79,26 @@ async def post_human_challenge(
 
     if isinstance(result, HTTPResponse):
         return result  # bad request
+    assert unique is not None
 
-    if result:
-        if isinstance(result, bool):
-            result = ["turnstile"]
-        assert unique is not None
-        if await is_proxy(request, client, database):
-            result.append("hcaptcha")
-        if r := await verify(request, result, body.get("c"), unique):
-            return r
+    captchas = ["turnstile"]
+    if result == (RequiredCaptchaType.CAPTCHA, RequiredCaptchaType.RAID):
+        captchas.append("hcaptcha")
+    
+    if not browser_check(request, browserdata):
+        if result == RequiredCaptchaType.RAID:
+            return text("Temporarily unavailable.", 403)
+        captchas.append("hcaptcha")
+
+    if await is_proxy(request, client, database):
+        # dont allow proxies during raids
+        if result == RequiredCaptchaType.RAID:
+            return text("Temporarily unavailable.", 403)
+
+        captchas.append("hcaptcha")
+
+    if r := await verify(request, captchas, body.get("c"), unique):
+        return r
 
     if payload["type"] == "j":  # joinguard
         result = await complete_join_guard(request, database, payload)
@@ -190,6 +211,182 @@ async def verify(
     return json(challenge, 403)
 
 
+def browser_check(request: Request, browserdata: BrowserData) -> bool:
+    # check if payload makes sense
+    browserdata_shape = {key: type(value) for key, value in browser_check.items()}
+    if browserdata_shape != BrowserData.__annotations__:
+        print("shape of browserdata does not match", browserdata_shape, browserdata)
+        return False
+    
+    # check if the values make sense
+    if browserdata["t1"] >= browserdata["t2"]:
+        print("current before page load", browserdata)
+        return False
+    
+    time_delta = abs(browserdata["t2"] - datetime.now().timestamp() * 1000)
+    if time_delta > 60:
+        print("time delta too large", time_delta, browserdata)
+        return False
+    
+    # check if sequence number makes sense
+    lower_bounds = (browserdata["t1"] + browserdata["t2"]) & 0xffff
+    upper_bounds = (browserdata["t1"] + browserdata["t2"] + 1000) & 0xffff
+    if lower_bounds > upper_bounds:  # its at the wrap around point
+        if upper_bounds < browserdata["s"] < lower_bounds:
+            print("sequence out of bounce (wrapped)", browserdata)
+            return False
+    else:
+        if not upper_bounds >= browserdata["s"] >= lower_bounds:
+            print("sequence out of bounce (not wrapped)", browserdata)
+            return False
+    
+    browsers = {"webkit", "firefox", "chromium"}
+
+    base_seed = bytearray((browserdata["t2"] & 0xffff_ffff).to_bytes(4, "big"))
+    base_seed[0] ^= browserdata["s"] >> 8
+    base_seed[1] ^= browserdata["s"] & 0xff
+    base_seed[2] ^= browserdata["s"] >> 8
+    base_seed[3] ^= browserdata["s"] & 0xff
+
+    key = crc32(bytes([x ^ 181 for x in base_seed])).to_bytes(4, "big")
+    decoded = b64parse(browserdata["m1"])
+    if decoded is None:
+        print("m1 is not valid base64", browserdata)
+        return False
+    decrypted = bytes([x ^ key[i % 4] for i, x in enumerate(decoded)])
+    print("m1", decrypted)
+    if decrypted == b"1.9275814160560204e-50":
+        browsers &= {"chromium"}
+    elif decrypted == b"1.9275814160560206e-50":
+        browsers &= {"webkit", "firefox"}
+    else:
+        print("invalid m1 value", decrypted)
+        return False
+
+    key = crc32(bytes([x ^ 40 for x in base_seed])).to_bytes(4, "big")
+    decoded = b64parse(browserdata["m2"])
+    if decoded is None:
+        print("m2 is not valid base64", browserdata)
+        return False
+    decrypted = bytes([x ^ key[i % 4] for i, x in enumerate(decoded)])
+    print("m2", decrypted)
+    if decrypted == b"1.046919966902314e+308":
+        browsers &= {"firefox"}
+    elif decrypted == b"1.0469199669023138e+308":
+        browsers &= {"webkit", "chromium"}
+    else:
+        print("invalid m2 value", decrypted)
+        return False
+
+    if not browsers:
+        print("conflicting math results")
+        return False
+    
+    has_sec_fetch = "safari" not in browsers
+    sec_fetch_headers = {"sec-fetch-dest", "sec-fetch-mode", "sec-fetch-site"}
+    if has_sec_fetch and request.headers.keys() & sec_fetch_headers != sec_fetch_headers:
+        print("request does not have all required sec-fetch-* headers", browsers, tuple(request.headers.keys()))
+        return False
+    elif not has_sec_fetch and request.headers.keys() & sec_fetch_headers:
+        print("request should not have sec-fetch-* headers", browsers, tuple(request.headers.keys()))
+        return False
+
+    has_sec_ch_ua = "chromium" in browsers
+    sec_ch_ua_headers = {"sec-ch-ua", "sec-ch-ua-mobile", "sec-ch-ua-platform"}
+    if has_sec_ch_ua and request.headers.keys() & sec_ch_ua_headers != sec_ch_ua_headers:
+        print("request does not have all required sec-ch-ua-* headers", browsers, tuple(request.headers.keys()))
+        return False
+    elif not has_sec_ch_ua and request.headers.keys() & sec_ch_ua_headers:
+        print("request should not have sec-ch-ua-* headers", browsers, tuple(request.headers.keys()))
+        return False
+
+    key = crc32(bytes([x ^ 149 for x in base_seed])).to_bytes(4, "big")
+    decoded = b64parse(browserdata["p1"])
+    if decoded is None:
+        print("p1 is not valid base64", browserdata)
+        return False
+    decrypted = bytes([x ^ key[i % 4] for i, x in enumerate(decoded)])
+    print("p1", decrypted)
+    try:
+        platform = decrypted.decode()
+    except UnicodeDecodeError:
+        print("invalid p1 value", decrypted)
+        return False
+    
+    if has_sec_ch_ua:
+        sec_ch_ua_platform = request.headers.get("sec-ch-ua-platform")
+        if platform != sec_ch_ua_platform:
+            print("platform in sec-ch-ua-platform header does not match", platform, sec_ch_ua_platform)
+            return False
+    
+    key = crc32(bytes([x ^ 67 for x in base_seed])).to_bytes(4, "big")
+    decoded = b64parse(browserdata["l1"])
+    if decoded is None:
+        print("l1 is not valid base64", browserdata)
+        return False
+    decrypted = bytes([x ^ key[i % 4] for i, x in enumerate(decoded)])
+    print("l1", decrypted)
+    try:
+        url = decrypted.decode()
+    except UnicodeDecodeError:
+        print("invalid l1 value", decrypted)
+        return False
+    
+    key = crc32(bytes([x ^ 114 for x in base_seed])).to_bytes(4, "big")
+    decoded = b64parse(browserdata["l2"])
+    if decoded is None:
+        print("l2 is not valid base64", browserdata)
+        return False
+    decrypted = bytes([x ^ key[i % 4] for i, x in enumerate(decoded)])
+    print("l2", decrypted)
+    try:
+        locale = decrypted.decode()
+    except UnicodeDecodeError:
+        print("invalid l2 value", decrypted)
+        return False
+    
+    accept_language = request.headers.get("accept-language")
+    if accept_language is None or locale not in accept_language:
+        print("invalid lcoale", locale, accept_language)
+        return False
+    
+    key = crc32(bytes([x ^ 184 for x in base_seed])).to_bytes(4, "big")
+    decoded = b64parse(browserdata["l3"])
+    if decoded is None:
+        print("l3 is not valid base64", browserdata)
+        return False
+    decrypted = bytes([x ^ key[i % 4] for i, x in enumerate(decoded)])
+    print("l3", decrypted)
+    try:
+        intl_check = decrypted.decode()
+    except UnicodeDecodeError:
+        print("invalid l3 value", decrypted)
+        return False
+
+    if intl_check.count("|") != 1:
+        print("invalid l3 | count", intl_check)
+        return False
+    # firefox seems to have issues with this
+    elif intl_check.split("|")[0] != intl_check.split("|")[1] and "firefox" not in browsers:
+        print("invalid l3 values", intl_check)
+        return False
+    
+    return True
+
+
+class BrowserData(typing.TypedDict):
+    t1: int
+    t2: int
+    s: int
+    m1: str
+    m2: str
+    p1: str
+    l1: str
+    l2: str
+    l3: str
+
+
+
 async def is_proxy(
     request: Request, client: AsyncClient, database: Redis[bytes]
 ) -> bool:
@@ -215,7 +412,7 @@ async def is_proxy(
 
 async def check_join_guard(
     request: Request, database: Redis[bytes], payload: dict[str, str]
-) -> tuple[HTTPResponse | bool | list[str], str]:
+) -> tuple[HTTPResponse | RequiredCaptchaType, str]:
     guild = payload.get("guild")
     if guild is None:
         return text("Missing 'guild' in body.payload"), ""
@@ -253,11 +450,11 @@ async def check_join_guard(
         return text("Missing required scope", 401), ""
 
     if await database.scard(f"guild:{guild}:joinguard") >= 20:
-        return ["hcaptcha"], f"j|{guild}"
+        return RequiredCaptchaType.RAID, f"j|{guild}"
     elif await get_config_field(database, guild, "joinguard_captcha"):
-        return True, f"j|{guild}"
+        return RequiredCaptchaType.CAPTCHA, f"j|{guild}"
 
-    return False, ""
+    return RequiredCaptchaType.DEFAULT, f"j|{guild}"
 
 
 async def complete_join_guard(
@@ -282,7 +479,7 @@ async def complete_join_guard(
 
 async def check_verification(
     request: Request, database: Redis[bytes], payload: dict[str, str]
-) -> tuple[HTTPResponse | bool | list[str], str]:
+) -> tuple[HTTPResponse | RequiredCaptchaType, str]:
     flow = payload.get("flow")
     if flow is None:
         return text("Missing 'flow' in body.payload"), ""
@@ -301,7 +498,7 @@ async def check_verification(
     elif not await get_config_field(database, guild_id, "verification_enabled"):
         return text("Guild does not have verification enabled", 409), ""
 
-    return True, f"v|{user_id}|{guild_id}"
+    return RequiredCaptchaType.CAPTCHA, f"v|{user_id}|{guild_id}"
 
 
 async def complete_verification(
@@ -323,7 +520,7 @@ async def complete_verification(
 
 async def check_super_verification(
     request: Request, database: Redis[bytes], payload: dict[str, str]
-) -> tuple[HTTPResponse | bool | list[str], str]:
+) -> tuple[HTTPResponse | RequiredCaptchaType, str]:
     guild = payload.get("guild")
     if guild is None:
         return text("Missing 'guild' in body.payload"), ""
@@ -357,14 +554,14 @@ async def check_super_verification(
 
     danger = await database.hlen(f"guild:{guild}:super-verification")
     if danger >= 20:
-        return ["hcaptcha"], f"sv{user_token.user_id}|{guild}"
+        return RequiredCaptchaType.RAID, f"sv{user_token.user_id}|{guild}"
     elif danger >= 10:
-        return True, f"sv|{user_token.user_id}|{guild}"
+        return RequiredCaptchaType.CAPTCHA, f"sv|{user_token.user_id}|{guild}"
 
     if await get_config_field(database, guild, "super_verification_captcha"):
-        return True, f"sv|{user_token.user_id}|{guild}"
+        return RequiredCaptchaType.CAPTCHA, f"sv|{user_token.user_id}|{guild}"
 
-    return False, ""
+    return RequiredCaptchaType.DEFAULT, f"sv|{user_token.user_id}|{guild}"
 
 
 async def complete_super_verification(
