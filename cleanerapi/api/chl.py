@@ -213,7 +213,9 @@ async def verify(
 
 def browser_check(request: Request, browserdata: BrowserData) -> bool:
     # check if payload makes sense
-    browserdata_shape = {k: typing.ForwardRef(type(v).__name__) for k, v in browserdata.items()}
+    browserdata_shape = {
+        k: typing.ForwardRef(type(v).__name__) for k, v in browserdata.items()
+    }
     # using a string compare cuz everything else just does not work
     if str(browserdata_shape) != str(BrowserData.__annotations__):
         print("shape of browserdata does not match", browserdata_shape, browserdata)
@@ -225,7 +227,7 @@ def browser_check(request: Request, browserdata: BrowserData) -> bool:
         return False
 
     time_delta = abs(browserdata["t2"] - datetime.now().timestamp() * 1000)
-    if time_delta > 60:
+    if time_delta > 60_000:
         print("time delta too large", time_delta, browserdata)
         return False
 
@@ -250,7 +252,6 @@ def browser_check(request: Request, browserdata: BrowserData) -> bool:
     base_seed[3] ^= browserdata["s"] & 0xFF
 
     key = crc32(bytes([x ^ 181 for x in base_seed])).to_bytes(4, "big")
-    print(int.from_bytes(key, "big"), key, base_seed, list(base_seed))
     decoded = b64parse(browserdata["m1"])
     if decoded is None:
         print("m1 is not valid base64", browserdata)
@@ -283,6 +284,8 @@ def browser_check(request: Request, browserdata: BrowserData) -> bool:
     if not browsers:
         print("conflicting math results")
         return False
+
+    print("possible browsers", browsers)
 
     has_sec_fetch = "safari" not in browsers
     sec_fetch_headers = {"sec-fetch-dest", "sec-fetch-mode", "sec-fetch-site"}
@@ -338,8 +341,15 @@ def browser_check(request: Request, browserdata: BrowserData) -> bool:
         return False
 
     if has_sec_ch_ua:
-        sec_ch_ua_platform = request.headers.get("sec-ch-ua-platform")
-        if platform != sec_ch_ua_platform:
+        sec_ch_ua_platform = (
+            request.headers["sec-ch-ua-platform"]
+            .lower()
+            .replace(" ", "")
+            .replace('"', "")
+        )
+        platform_map = {"macos": "mac", "windows": "win"}
+        sec_ch_ua_platform = platform_map.get(sec_ch_ua_platform, sec_ch_ua_platform)
+        if sec_ch_ua_platform not in platform.lower():
             print(
                 "platform in sec-ch-ua-platform header does not match",
                 platform,
