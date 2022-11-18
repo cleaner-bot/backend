@@ -287,7 +287,7 @@ def browser_check(request: Request, browserdata: BrowserData) -> bool:
 
     print("possible browsers", browsers)
 
-    has_sec_fetch = "safari" not in browsers
+    has_sec_fetch = "webkit" not in browsers
     sec_fetch_headers = {"sec-fetch-dest", "sec-fetch-mode", "sec-fetch-site"}
     if (
         has_sec_fetch
