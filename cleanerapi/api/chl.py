@@ -141,7 +141,7 @@ async def verify(
         ).digest()
         if hmac.compare_digest(expected_signature, chl_signature):
             rnd = random.Random(chl_svm_seed)
-            svm_challenge = rnd.randbytes(4096)
+            svm_challenge = rnd.randbytes(2048)
             key = svm(svm_challenge)
             raw_token = bytes(x ^ key[i & 0xFF] for i, x in enumerate(chl_token))
             challenge_provider = captcha_providers[body["i"]]
@@ -173,7 +173,7 @@ async def verify(
 
     svm_seed = os.urandom(32)
     rnd = random.Random(svm_seed)
-    svm_challenge = rnd.randbytes(4096)
+    svm_challenge = rnd.randbytes(2048)
     signature = hmac.new(
         bytes.fromhex(request.app.config.BACKEND_AUTH_SECRET),
         unique.encode()
