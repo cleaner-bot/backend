@@ -19,6 +19,7 @@ from sanic_ext import openapi
 
 from ..helpers.auth import UserInfo, get_user_guilds, parse_user_token
 from ..helpers.based import b64parse
+from ..helpers.browserdetect import BrowserCheckResult, BrowserData, browser_check
 from ..helpers.challenge_providers import verify_hcaptcha, verify_turnstile
 from ..helpers.fingerprint import fingerprint
 from ..helpers.rpc import rpc_call
@@ -85,10 +86,13 @@ async def post_human_challenge(
     if result in (RequiredCaptchaType.CAPTCHA, RequiredCaptchaType.RAID):
         captchas.append("hcaptcha")
 
-    if not browser_check(request, typing.cast(BrowserData, browserdata)):
+    browser_result = browser_check(request, typing.cast(BrowserData, browserdata))
+    if browser_result != BrowserCheckResult.OK:
         if result == RequiredCaptchaType.RAID:
             return text("Temporarily unavailable.", 403)
         captchas.append("hcaptcha")
+        if browser_result == BrowserCheckResult.TAMPERED:
+            captchas.extend(("turnstile", "hcaptcha"))
 
     if await is_proxy(request, client, database):
         # dont allow proxies during raids
@@ -210,247 +214,6 @@ async def verify(
         challenge["captcha"]["sitekey"] = request.app.config.HCAPTCHA_SITEKEY
 
     return json(challenge, 403)
-
-
-def browser_check(request: Request, browserdata: BrowserData) -> bool:
-    # check if payload makes sense
-    browserdata_shape = {
-        k: typing.ForwardRef(type(v).__name__) for k, v in browserdata.items()
-    }
-    # using a string compare cuz everything else just does not work
-    if str(browserdata_shape) != str(BrowserData.__annotations__):
-        print("shape of browserdata does not match", browserdata_shape, browserdata)
-        return False
-
-    # check if the values make sense
-    if browserdata["t1"] >= browserdata["t2"]:
-        print("current before page load", browserdata)
-        return False
-
-    time_delta = abs(browserdata["t2"] - datetime.now().timestamp() * 1000)
-    if time_delta > 60_000:
-        print("time delta too large", time_delta, browserdata)
-        return False
-
-    # check if sequence number makes sense
-    lower_bounds = (browserdata["t1"] + browserdata["t2"]) & 0xFFFF
-    upper_bounds = (browserdata["t1"] + browserdata["t2"] + 1000) & 0xFFFF
-    if lower_bounds > upper_bounds:  # its at the wrap around point
-        if upper_bounds < browserdata["s"] < lower_bounds:
-            print("sequence out of bounce (wrapped)", browserdata)
-            return False
-    else:
-        if not upper_bounds >= browserdata["s"] >= lower_bounds:
-            print("sequence out of bounce (not wrapped)", browserdata)
-            return False
-
-    browsers = {"webkit", "firefox", "chromium"}
-
-    base_seed = bytearray((browserdata["t2"] & 0xFFFF_FFFF).to_bytes(4, "big"))
-    base_seed[0] ^= browserdata["s"] >> 8
-    base_seed[1] ^= browserdata["s"] & 0xFF
-    base_seed[2] ^= browserdata["s"] >> 8
-    base_seed[3] ^= browserdata["s"] & 0xFF
-
-    key = crc32(bytes([x ^ 181 for x in base_seed])).to_bytes(4, "big")
-    decoded = b64parse(browserdata["m1"])
-    if decoded is None:
-        print("m1 is not valid base64", browserdata)
-        return False
-    decrypted = bytes([x ^ key[i % 4] for i, x in enumerate(decoded)])
-    print("m1", decrypted)
-    if decrypted == b"1.9275814160560204e-50":
-        browsers &= {"chromium"}
-    elif decrypted == b"1.9275814160560206e-50":
-        browsers &= {"webkit", "firefox"}
-    else:
-        print("invalid m1 value", decrypted)
-        return False
-
-    key = crc32(bytes([x ^ 40 for x in base_seed])).to_bytes(4, "big")
-    decoded = b64parse(browserdata["m2"])
-    if decoded is None:
-        print("m2 is not valid base64", browserdata)
-        return False
-    decrypted = bytes([x ^ key[i % 4] for i, x in enumerate(decoded)])
-    print("m2", decrypted)
-    if decrypted == b"1.046919966902314e+308":
-        browsers &= {"firefox"}
-    elif decrypted == b"1.0469199669023138e+308":
-        browsers &= {"webkit", "chromium"}
-    else:
-        print("invalid m2 value", decrypted)
-        return False
-
-    if not browsers:
-        print("conflicting math results")
-        return False
-
-    print("possible browsers", browsers)
-
-    has_sec_fetch = "webkit" not in browsers
-    sec_fetch_headers = {"sec-fetch-dest", "sec-fetch-mode", "sec-fetch-site"}
-    if (
-        has_sec_fetch
-        and request.headers.keys() & sec_fetch_headers != sec_fetch_headers
-    ):
-        print(
-            "request does not have all required sec-fetch-* headers",
-            browsers,
-            tuple(request.headers.keys()),
-        )
-        return False
-    elif not has_sec_fetch and request.headers.keys() & sec_fetch_headers:
-        print(
-            "request should not have sec-fetch-* headers",
-            browsers,
-            tuple(request.headers.keys()),
-        )
-        return False
-
-    has_sec_ch_ua = "chromium" in browsers
-    sec_ch_ua_headers = {"sec-ch-ua", "sec-ch-ua-mobile", "sec-ch-ua-platform"}
-    if (
-        has_sec_ch_ua
-        and request.headers.keys() & sec_ch_ua_headers != sec_ch_ua_headers
-    ):
-        print(
-            "request does not have all required sec-ch-ua-* headers",
-            browsers,
-            tuple(request.headers.keys()),
-        )
-        return False
-    elif not has_sec_ch_ua and request.headers.keys() & sec_ch_ua_headers:
-        print(
-            "request should not have sec-ch-ua-* headers",
-            browsers,
-            tuple(request.headers.keys()),
-        )
-        return False
-
-    key = crc32(bytes([x ^ 149 for x in base_seed])).to_bytes(4, "big")
-    decoded = b64parse(browserdata["p1"])
-    if decoded is None:
-        print("p1 is not valid base64", browserdata)
-        return False
-    decrypted = bytes([x ^ key[i % 4] for i, x in enumerate(decoded)])
-    print("p1", decrypted)
-    try:
-        platform = decrypted.decode()
-    except UnicodeDecodeError:
-        print("invalid p1 value", decrypted)
-        return False
-
-    if has_sec_ch_ua:
-        sec_ch_ua_platform = (
-            request.headers["sec-ch-ua-platform"]
-            .lower()
-            .replace(" ", "")
-            .replace('"', "")
-        )
-        platform_map = {"macos": "mac", "windows": "win"}
-        sec_ch_ua_platform = platform_map.get(sec_ch_ua_platform, sec_ch_ua_platform)
-        if sec_ch_ua_platform not in platform.lower():
-            print(
-                "platform in sec-ch-ua-platform header does not match",
-                platform,
-                sec_ch_ua_platform,
-            )
-            return False
-
-    key = crc32(bytes([x ^ 67 for x in base_seed])).to_bytes(4, "big")
-    decoded = b64parse(browserdata["l1"])
-    if decoded is None:
-        print("l1 is not valid base64", browserdata)
-        return False
-    decrypted = bytes([x ^ key[i % 4] for i, x in enumerate(decoded)])
-    print("l1", decrypted)
-    try:
-        url = decrypted.decode()
-    except UnicodeDecodeError:
-        print("invalid l1 value", decrypted)
-        return False
-
-    key = crc32(bytes([x ^ 114 for x in base_seed])).to_bytes(4, "big")
-    decoded = b64parse(browserdata["l2"])
-    if decoded is None:
-        print("l2 is not valid base64", browserdata)
-        return False
-    decrypted = bytes([x ^ key[i % 4] for i, x in enumerate(decoded)])
-    print("l2", decrypted)
-    try:
-        locale = decrypted.decode()
-    except UnicodeDecodeError:
-        print("invalid l2 value", decrypted)
-        return False
-
-    accept_language = request.headers.get("accept-language")
-    if accept_language is None or locale not in accept_language:
-        print("invalid lcoale", locale, accept_language)
-        return False
-
-    key = crc32(bytes([x ^ 184 for x in base_seed])).to_bytes(4, "big")
-    decoded = b64parse(browserdata["l3"])
-    if decoded is None:
-        print("l3 is not valid base64", browserdata)
-        return False
-    decrypted = bytes([x ^ key[i % 4] for i, x in enumerate(decoded)])
-    print("l3", decrypted)
-    try:
-        intl_check = decrypted.decode()
-    except UnicodeDecodeError:
-        print("invalid l3 value", decrypted)
-        return False
-
-    if intl_check.count("|") != 1:
-        print("invalid l3 | count", intl_check)
-        return False
-    # firefox seems to have issues with this
-    elif (
-        intl_check.split("|")[0] != intl_check.split("|")[1]
-        and "firefox" not in browsers
-    ):
-        print("invalid l3 values", intl_check)
-        return False
-
-    key = crc32(bytes([x ^ 84 for x in base_seed])).to_bytes(4, "big")
-    decoded = b64parse(browserdata["f"])
-    if decoded is None:
-        print("f is not valid base64", browserdata)
-        return False
-    offset = 0
-    fonts = []
-    while offset < len(decoded):
-        length = decoded[offset] ^ 15 ^ key[3]
-        decrypted = bytes(
-            [
-                x ^ key[(offset + 1 + i) % 4]
-                for i, x in enumerate(decoded[offset + 1 : offset + 1 + length])
-            ]
-        )
-        offset += 1 + length
-        try:
-            font = decrypted.decode()
-        except UnicodeDecodeError:
-            print("invalid f value", length, decrypted)
-            return False
-        fonts.append(font)
-    print("f", fonts)
-
-    return True
-
-
-class BrowserData(typing.TypedDict):
-    t1: int
-    t2: int
-    s: int
-    m1: str
-    m2: str
-    p1: str
-    l1: str
-    l2: str
-    l3: str
-    f: str
 
 
 async def is_proxy(
