@@ -413,6 +413,30 @@ def browser_check(request: Request, browserdata: BrowserData) -> bool:
         print("invalid l3 values", intl_check)
         return False
 
+    key = crc32(bytes([x ^ 84 for x in base_seed])).to_bytes(4, "big")
+    decoded = b64parse(browserdata["f"])
+    if decoded is None:
+        print("f is not valid base64", browserdata)
+        return False
+    offset = 0
+    fonts = []
+    while offset < len(decoded):
+        length = decoded[offset] ^ 15 ^ key[3]
+        decrypted = bytes(
+            [
+                x ^ key[(offset + 1 + i) % 4]
+                for i, x in enumerate(decoded[offset + 1 : offset + 1 + length])
+            ]
+        )
+        offset += 1 + length
+        try:
+            font = decrypted.decode()
+        except UnicodeDecodeError:
+            print("invalid f value", length, decrypted)
+            return False
+        fonts.append(font)
+    print("f", fonts)
+
     return True
 
 
@@ -426,6 +450,7 @@ class BrowserData(typing.TypedDict):
     l1: str
     l2: str
     l3: str
+    f: str
 
 
 async def is_proxy(
