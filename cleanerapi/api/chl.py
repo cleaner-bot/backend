@@ -144,7 +144,7 @@ async def verify(
             svm_challenge = rnd.randbytes(2048)
             key = svm(svm_challenge)
             raw_token = bytes(x ^ key[i & 0xFF] for i, x in enumerate(chl_token))
-            provider_index = body["t"]
+            provider_index = body["i"]
             challenge_provider = captcha_providers[provider_index]
             if (
                 crc32(bytes(x ^ 0xFF for x in raw_token[:-4])).to_bytes(
