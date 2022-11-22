@@ -10,7 +10,32 @@ from sanic import Request
 from .based import b64parse
 
 
+class BrowserCheckResult(enum.Enum):
+    OK = 0
+    SUSPICIOUS = 1
+    TAMPERED = 2
+    BAD_REQUEST = 3
+
+
+class Browser(enum.Enum):
+    WEBKIT = enum.auto()
+    CHROMIUM = enum.auto()
+    FIREFOX = enum.auto()
+    UNKNOWN = enum.auto()
+
+
+class Platform(enum.Enum):
+    ANDROID = enum.auto()
+    IOS = enum.auto()
+    MAC = enum.auto()
+    LINUX = enum.auto()
+    WINDOWS = enum.auto()
+    UNKNOWN = enum.auto()
+
+
+SEC_FETCH_BROWSERS = {Browser.FIREFOX, Browser.CHROMIUM}
 SEC_FETCH_HEADERS = {"sec-fetch-dest", "sec-fetch-mode", "sec-fetch-site"}
+SEC_CH_UA_BROWSERS = {Browser.CHROMIUM}
 SEC_CH_UA_HEADERS = {"sec-ch-ua", "sec-ch-ua-mobile", "sec-ch-ua-platform"}
 WINDOWS_FONTS = {
     "Cambria Math",
@@ -38,13 +63,9 @@ LINUX_FONTS = {
 }
 
 
-class BrowserCheckResult(enum.Enum):
-    OK = enum.auto()
-    SUSPICIOUS = enum.auto()
-    TAMPERED = enum.auto()
-
-
-def browser_check(request: Request, browserdata: BrowserData) -> BrowserCheckResult:
+def browser_check(
+    request: Request, browserdata: BrowserData
+) -> tuple[BrowserCheckResult, bytes]:
     # check if payload makes sense
     browserdata_shape = {
         k: typing.ForwardRef(type(v).__name__) for k, v in browserdata.items()
@@ -52,8 +73,58 @@ def browser_check(request: Request, browserdata: BrowserData) -> BrowserCheckRes
     # using a string compare cuz everything else just does not work
     if str(browserdata_shape) != str(BrowserData.__annotations__):
         print("shape of browserdata does not match", browserdata_shape, browserdata)
-        return BrowserCheckResult.TAMPERED
+        return BrowserCheckResult.BAD_REQUEST, b""
 
+    time_valid = check_time(browserdata)
+    sequence_valid = check_sequence(browserdata)
+    if (
+        time_valid == BrowserCheckResult.TAMPERED
+        or sequence_valid == BrowserCheckResult.TAMPERED
+    ):
+        return BrowserCheckResult.BAD_REQUEST, b""
+
+    base_seed = bytearray((browserdata["t2"] & 0xFFFF_FFFF).to_bytes(4, "big"))
+    base_seed[0] ^= browserdata["s"] >> 8
+    base_seed[1] ^= browserdata["s"] & 0xFF
+    base_seed[2] ^= browserdata["s"] >> 8
+    base_seed[3] ^= browserdata["s"] & 0xFF
+
+    math_result, browser = check_math(browserdata, base_seed)
+    browser_headers_result = check_browser_headers(request, browser)
+    platform_result, platform = check_platform(browserdata, base_seed)
+    platform_ch_result = check_platform_ch(request, browser, platform)
+    url_result, url = check_url(browserdata, base_seed)
+    locale_result, locale = check_locale(browserdata, base_seed, request)
+    locale_spoof_result, locale_spoof = check_locale_spoof(
+        browserdata, base_seed, browser
+    )
+    fonts_result, fonts = check_fonts(browserdata, base_seed, platform)
+
+    fingerprint = b"\x00".join(
+        [
+            browser.name.encode(),
+            platform.name.encode(),
+            url,
+            locale,
+            locale_spoof,
+            *map(str.encode, fonts),
+        ]
+    )
+    results = [
+        math_result,
+        browser_headers_result,
+        platform_result,
+        platform_ch_result,
+        url_result,
+        locale_result,
+        locale_spoof_result,
+        fonts_result,
+    ]
+
+    return max(results, key=lambda x: x.value), fingerprint
+
+
+def check_time(browserdata: BrowserData) -> BrowserCheckResult:
     # check if the values make sense
     if browserdata["t1"] >= browserdata["t2"]:
         print("current before page load", browserdata)
@@ -64,6 +135,10 @@ def browser_check(request: Request, browserdata: BrowserData) -> BrowserCheckRes
         print("time delta too large", time_delta, browserdata)
         return BrowserCheckResult.SUSPICIOUS
 
+    return BrowserCheckResult.OK
+
+
+def check_sequence(browserdata: BrowserData) -> BrowserCheckResult:
     # check if sequence number makes sense
     lower_bounds = (browserdata["t1"] + browserdata["t2"]) & 0xFFFF
     upper_bounds = (browserdata["t1"] + browserdata["t2"] + 1000) & 0xFFFF
@@ -76,51 +151,53 @@ def browser_check(request: Request, browserdata: BrowserData) -> BrowserCheckRes
             print("sequence out of bounce (not wrapped)", browserdata)
             return BrowserCheckResult.TAMPERED
 
-    browsers = {"webkit", "firefox", "chromium"}
+    return BrowserCheckResult.OK
 
-    base_seed = bytearray((browserdata["t2"] & 0xFFFF_FFFF).to_bytes(4, "big"))
-    base_seed[0] ^= browserdata["s"] >> 8
-    base_seed[1] ^= browserdata["s"] & 0xFF
-    base_seed[2] ^= browserdata["s"] >> 8
-    base_seed[3] ^= browserdata["s"] & 0xFF
 
-    key = crc32(bytes([x ^ 181 for x in base_seed])).to_bytes(4, "big")
-    decoded = b64parse(browserdata["m1"])
-    if decoded is None:
+def check_math(
+    browserdata: BrowserData, base_seed: bytes
+) -> tuple[BrowserCheckResult, Browser]:
+    key_m1 = crc32(bytes([x ^ 181 for x in base_seed])).to_bytes(4, "big")
+    decoded_m1 = b64parse(browserdata["m1"])
+    if decoded_m1 is None:
         print("m1 is not valid base64", browserdata)
-        return BrowserCheckResult.TAMPERED
-    decrypted = bytes([x ^ key[i % 4] for i, x in enumerate(decoded)])
-    print("m1", decrypted)
-    if decrypted == b"1.9275814160560204e-50":
+        return BrowserCheckResult.BAD_REQUEST, Browser.UNKNOWN
+    m1 = bytes([x ^ key_m1[i % 4] for i, x in enumerate(decoded_m1)])
+
+    key_m2 = crc32(bytes([x ^ 40 for x in base_seed])).to_bytes(4, "big")
+    decoded_m2 = b64parse(browserdata["m2"])
+    if decoded_m2 is None:
+        print("m2 is not valid base64", browserdata)
+        return BrowserCheckResult.BAD_REQUEST, Browser.UNKNOWN
+    m2 = bytes([x ^ key_m2[i % 4] for i, x in enumerate(decoded_m2)])
+
+    browsers = {Browser.WEBKIT, Browser.CHROMIUM, Browser.FIREFOX}
+    if m1 == b"1.9275814160560204e-50":
         browsers &= {"chromium"}
-    elif decrypted == b"1.9275814160560206e-50":
+    elif m1 == b"1.9275814160560206e-50":
         browsers &= {"webkit", "firefox"}
     else:
-        print("invalid m1 value", decrypted)
-        return BrowserCheckResult.SUSPICIOUS
+        print("invalid m1 value", m1)
+        return BrowserCheckResult.SUSPICIOUS, Browser.UNKNOWN
 
-    key = crc32(bytes([x ^ 40 for x in base_seed])).to_bytes(4, "big")
-    decoded = b64parse(browserdata["m2"])
-    if decoded is None:
-        print("m2 is not valid base64", browserdata)
-        return BrowserCheckResult.TAMPERED
-    decrypted = bytes([x ^ key[i % 4] for i, x in enumerate(decoded)])
-    print("m2", decrypted)
-    if decrypted == b"1.046919966902314e+308":
+    if m2 == b"1.046919966902314e+308":
         browsers &= {"firefox"}
-    elif decrypted == b"1.0469199669023138e+308":
+    elif m2 == b"1.0469199669023138e+308":
         browsers &= {"webkit", "chromium"}
     else:
-        print("invalid m2 value", decrypted)
-        return BrowserCheckResult.SUSPICIOUS
+        print("invalid m2 value", m2)
+        return BrowserCheckResult.SUSPICIOUS, Browser.UNKNOWN
 
-    if not browsers:
-        print("conflicting math results")
-        return BrowserCheckResult.SUSPICIOUS
+    if len(browsers) != 1:
+        print("conflicting math results", browsers)
+        return BrowserCheckResult.SUSPICIOUS, Browser.UNKNOWN
 
-    print("possible browsers", browsers)
+    (browser,) = browsers
+    return BrowserCheckResult.OK, browser
 
-    has_sec_fetch = "webkit" not in browsers
+
+def check_browser_headers(request: Request, browser: Browser) -> BrowserCheckResult:
+    has_sec_fetch = browser in SEC_FETCH_BROWSERS
 
     if (
         has_sec_fetch
@@ -128,19 +205,19 @@ def browser_check(request: Request, browserdata: BrowserData) -> BrowserCheckRes
     ):
         print(
             "request does not have all required sec-fetch-* headers",
-            browsers,
+            browser,
             tuple(request.headers.keys()),
         )
         return BrowserCheckResult.TAMPERED
     elif not has_sec_fetch and request.headers.keys() & SEC_FETCH_HEADERS:
         print(
             "request should not have sec-fetch-* headers",
-            browsers,
+            browser,
             tuple(request.headers.keys()),
         )
         return BrowserCheckResult.TAMPERED
 
-    has_sec_ch_ua = "chromium" in browsers
+    has_sec_ch_ua = browser in SEC_CH_UA_BROWSERS
 
     if (
         has_sec_ch_ua
@@ -148,108 +225,162 @@ def browser_check(request: Request, browserdata: BrowserData) -> BrowserCheckRes
     ):
         print(
             "request does not have all required sec-ch-ua-* headers",
-            browsers,
+            browser,
             tuple(request.headers.keys()),
         )
         return BrowserCheckResult.TAMPERED
     elif not has_sec_ch_ua and request.headers.keys() & SEC_CH_UA_HEADERS:
         print(
             "request should not have sec-ch-ua-* headers",
-            browsers,
+            browser,
             tuple(request.headers.keys()),
         )
         return BrowserCheckResult.TAMPERED
 
+    return BrowserCheckResult.OK
+
+
+def check_platform(
+    browserdata: BrowserData, base_seed: bytes
+) -> tuple[BrowserCheckResult, Platform]:
     key = crc32(bytes([x ^ 149 for x in base_seed])).to_bytes(4, "big")
     decoded = b64parse(browserdata["p1"])
     if decoded is None:
         print("p1 is not valid base64", browserdata)
-        return BrowserCheckResult.TAMPERED
+        return BrowserCheckResult.BAD_REQUEST, Platform.UNKNOWN
     decrypted = bytes([x ^ key[i % 4] for i, x in enumerate(decoded)])
     print("p1", decrypted)
     try:
         platform = decrypted.decode()
     except UnicodeDecodeError:
         print("invalid p1 value", decrypted)
-        return BrowserCheckResult.TAMPERED
+        return BrowserCheckResult.TAMPERED, Platform.UNKNOWN
 
-    if has_sec_ch_ua:
-        sec_ch_ua_platform = (
-            request.headers["sec-ch-ua-platform"]
-            .lower()
-            .replace(" ", "")
-            .replace('"', "")
+    if platform.startswith("iP"):
+        return BrowserCheckResult.OK, Platform.IOS
+    elif platform.startswith("Mac"):
+        return BrowserCheckResult.OK, Platform.MAC
+    elif platform.startswith("Linux"):
+        return BrowserCheckResult.OK, Platform.LINUX
+    elif platform.startswith("Win"):
+        return BrowserCheckResult.OK, Platform.WINDOWS
+    return BrowserCheckResult.OK, Platform.UNKNOWN
+
+
+def check_platform_ch(
+    request: Request, browser: Browser, platform: Platform
+) -> BrowserCheckResult:
+    if browser not in SEC_CH_UA_BROWSERS:
+        return BrowserCheckResult.OK  # N/A
+
+    ch_platform_header = request.headers.get("sec-ch-ua-platform", "")
+    match ch_platform_header:
+        case "Android":
+            ch_platform = Platform.ANDROID
+        case "iOS":
+            ch_platform = Platform.IOS
+        case "Linux":
+            ch_platform = Platform.LINUX
+        case "macOS":
+            ch_platform = Platform.MAC
+        case "Windows":
+            ch_platform = Platform.WINDOWS
+        case _:
+            ch_platform = Platform.UNKNOWN
+
+    if ch_platform != platform:
+        print(
+            "platform in sec-ch-ua-platform header does not match",
+            platform,
+            ch_platform,
+            ch_platform_header,
         )
-        platform_map = {"macos": "mac", "windows": "win"}
-        sec_ch_ua_platform = platform_map.get(sec_ch_ua_platform, sec_ch_ua_platform)
-        if sec_ch_ua_platform not in platform.lower():
-            print(
-                "platform in sec-ch-ua-platform header does not match",
-                platform,
-                sec_ch_ua_platform,
-            )
-            return BrowserCheckResult.TAMPERED
+        return BrowserCheckResult.SUSPICIOUS
 
+    return BrowserCheckResult.OK
+
+
+def check_url(
+    browserdata: BrowserData, base_seed: bytes
+) -> tuple[BrowserCheckResult, bytes]:
     key = crc32(bytes([x ^ 67 for x in base_seed])).to_bytes(4, "big")
     decoded = b64parse(browserdata["l1"])
     if decoded is None:
         print("l1 is not valid base64", browserdata)
-        return BrowserCheckResult.TAMPERED
+        return BrowserCheckResult.BAD_REQUEST, b""
     decrypted = bytes([x ^ key[i % 4] for i, x in enumerate(decoded)])
     print("l1", decrypted)
     try:
         url = decrypted.decode()
     except UnicodeDecodeError:
         print("invalid l1 value", decrypted)
-        return BrowserCheckResult.TAMPERED
+        return BrowserCheckResult.TAMPERED, decrypted
 
+    return BrowserCheckResult.OK, url.encode()
+
+
+def check_locale(
+    browserdata: BrowserData, base_seed: bytes, request: Request
+) -> tuple[BrowserCheckResult, bytes]:
     key = crc32(bytes([x ^ 114 for x in base_seed])).to_bytes(4, "big")
     decoded = b64parse(browserdata["l2"])
     if decoded is None:
         print("l2 is not valid base64", browserdata)
-        return BrowserCheckResult.TAMPERED
+        return BrowserCheckResult.BAD_REQUEST, b""
     decrypted = bytes([x ^ key[i % 4] for i, x in enumerate(decoded)])
     print("l2", decrypted)
     try:
         locale = decrypted.decode()
     except UnicodeDecodeError:
         print("invalid l2 value", decrypted)
-        return BrowserCheckResult.TAMPERED
+        return BrowserCheckResult.TAMPERED, decrypted
 
     accept_language = request.headers.get("accept-language")
     if accept_language is None or locale not in accept_language:
-        print("invalid lcoale", locale, accept_language)
-        return BrowserCheckResult.TAMPERED
+        print("invalid locale", locale, accept_language)
+        return BrowserCheckResult.TAMPERED, locale.encode()
 
+    return BrowserCheckResult.OK, locale.encode()
+
+
+def check_locale_spoof(
+    browserdata: BrowserData, base_seed: bytes, browser: Browser
+) -> tuple[BrowserCheckResult, bytes]:
     key = crc32(bytes([x ^ 184 for x in base_seed])).to_bytes(4, "big")
     decoded = b64parse(browserdata["l3"])
     if decoded is None:
         print("l3 is not valid base64", browserdata)
-        return BrowserCheckResult.TAMPERED
+        return BrowserCheckResult.BAD_REQUEST, b""
     decrypted = bytes([x ^ key[i % 4] for i, x in enumerate(decoded)])
     print("l3", decrypted)
     try:
         intl_check = decrypted.decode()
     except UnicodeDecodeError:
         print("invalid l3 value", decrypted)
-        return BrowserCheckResult.TAMPERED
+        return BrowserCheckResult.TAMPERED, decrypted
 
     if intl_check.count("|") != 1:
         print("invalid l3 | count", intl_check)
-        return BrowserCheckResult.TAMPERED
+        return BrowserCheckResult.TAMPERED, intl_check.encode()
     # firefox seems to have issues with this
     elif (
         intl_check.split("|")[0] != intl_check.split("|")[1]
-        and "firefox" not in browsers
+        and browser != Browser.FIREFOX
     ):
         print("invalid l3 values", intl_check)
-        return BrowserCheckResult.SUSPICIOUS
+        return BrowserCheckResult.SUSPICIOUS, intl_check.encode()
 
+    return BrowserCheckResult.OK, intl_check.encode()
+
+
+def check_fonts(
+    browserdata: BrowserData, base_seed: bytes, platform: Platform
+) -> tuple[BrowserCheckResult, set[str]]:
     key = crc32(bytes([x ^ 84 for x in base_seed])).to_bytes(4, "big")
     decoded = b64parse(browserdata["f"])
     if decoded is None:
         print("f is not valid base64", browserdata)
-        return BrowserCheckResult.TAMPERED
+        return BrowserCheckResult.BAD_REQUEST, set()
     offset = 0
     fonts = set()
     while offset < len(decoded):
@@ -265,29 +396,30 @@ def browser_check(request: Request, browserdata: BrowserData) -> BrowserCheckRes
             font = decrypted.decode()
         except UnicodeDecodeError:
             print("invalid f value", length, decrypted)
-            return BrowserCheckResult.TAMPERED
+            return BrowserCheckResult.TAMPERED, set()
         fonts.add(font)
+
     print("f", fonts)
     if fonts & APPLE_FONTS:
-        if not platform.startswith("iP") and not platform.startswith("Mac"):
+        if platform in {Platform.MAC, Platform.IOS}:
             print("apple fonts, but not apple platform", platform)
-            return BrowserCheckResult.TAMPERED
+            return BrowserCheckResult.TAMPERED, fonts
 
     elif fonts & WINDOWS_FONTS:
-        if not platform.startswith("Win"):
+        if platform == Platform.WINDOWS:
             print("windows fonts, but not windows platform", platform)
-            return BrowserCheckResult.TAMPERED
+            return BrowserCheckResult.TAMPERED, fonts
 
     elif fonts & LINUX_FONTS:
-        if not platform.startswith("Linux"):
+        if platform == Platform.LINUX:
             print("linux fonts, but not linux platform", platform)
-            return BrowserCheckResult.TAMPERED
+            return BrowserCheckResult.TAMPERED, fonts
 
     else:
         print("unknown platform for fonts")
-        return BrowserCheckResult.SUSPICIOUS
+        return BrowserCheckResult.SUSPICIOUS, fonts
 
-    return BrowserCheckResult.OK
+    return BrowserCheckResult.OK, fonts
 
 
 class BrowserData(typing.TypedDict):
