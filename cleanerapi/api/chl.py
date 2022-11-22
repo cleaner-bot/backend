@@ -144,7 +144,8 @@ async def verify(
             svm_challenge = rnd.randbytes(2048)
             key = svm(svm_challenge)
             raw_token = bytes(x ^ key[i & 0xFF] for i, x in enumerate(chl_token))
-            challenge_provider = captcha_providers[body["i"]]
+            provider_index = body["t"]
+            challenge_provider = captcha_providers[provider_index]
             if (
                 crc32(bytes(x ^ 0xFF for x in raw_token[:-4])).to_bytes(
                     4, "big", signed=False
@@ -154,19 +155,19 @@ async def verify(
                 pass
 
             elif body["t"] < timestamp - 300_000:
-                provider_index = body["t"]
+                pass
 
             elif challenge_provider == "hcaptcha":
                 token = raw_token[:-4].decode()
                 if await verify_hcaptcha(request.app, token, request.ip):
-                    provider_index = body["i"] + 1
+                    provider_index += 1
 
             elif challenge_provider == "turnstile":
                 token = raw_token[:-4].decode()
                 if await verify_turnstile(
                     request.app, token, request.ip, chl_signature.hex()
                 ):
-                    provider_index = body["i"] + 1
+                    provider_index += 1
 
     if provider_index >= len(captcha_providers):
         return None
