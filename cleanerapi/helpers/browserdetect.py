@@ -173,17 +173,17 @@ def check_math(
 
     browsers = {Browser.WEBKIT, Browser.CHROMIUM, Browser.FIREFOX}
     if m1 == b"1.9275814160560204e-50":
-        browsers &= {"chromium"}
+        browsers &= {Browser.CHROMIUM}
     elif m1 == b"1.9275814160560206e-50":
-        browsers &= {"webkit", "firefox"}
+        browsers &= {Browser.WEBKIT, Browser.FIREFOX}
     else:
         print("invalid m1 value", m1)
         return BrowserCheckResult.SUSPICIOUS, Browser.UNKNOWN
 
     if m2 == b"1.046919966902314e+308":
-        browsers &= {"firefox"}
+        browsers &= {Browser.FIREFOX}
     elif m2 == b"1.0469199669023138e+308":
-        browsers &= {"webkit", "chromium"}
+        browsers &= {Browser.WEBKIT, Browser.CHROMIUM}
     else:
         print("invalid m2 value", m2)
         return BrowserCheckResult.SUSPICIOUS, Browser.UNKNOWN
