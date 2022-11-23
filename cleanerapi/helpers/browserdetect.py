@@ -273,7 +273,9 @@ def check_platform_ch(
     if browser not in SEC_CH_UA_BROWSERS:
         return BrowserCheckResult.OK  # N/A
 
-    ch_platform_header = request.headers.get("sec-ch-ua-platform", "")
+    ch_platform_header = (
+        request.headers.get("sec-ch-ua-platform", "").replace('"', "").replace("'", "")
+    )
     match ch_platform_header:
         case "Android":
             ch_platform = Platform.ANDROID
