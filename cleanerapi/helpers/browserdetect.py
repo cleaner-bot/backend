@@ -460,6 +460,7 @@ def check_connection_rtt(
         return BrowserCheckResult.BAD_REQUEST
     rtt = decoded[1] ^ key[3]
     if rtt == 0:
+        print("0 rtt detected")
         return BrowserCheckResult.SUSPICIOUS
     return BrowserCheckResult.OK
 
@@ -529,20 +530,29 @@ def check_detections(
     if decoded is None:
         print("k is not valid base64", browserdata)
         return BrowserCheckResult.BAD_REQUEST
-    elif len(decoded) % 2 == 1 or len(decoded) < 20:
+    elif len(decoded) % 2 == 1 or len(decoded) < 40:
         print("k has incorrect length", len(decoded), decoded, browserdata)
         return BrowserCheckResult.BAD_REQUEST
 
     decrypted = bytes([x ^ key[i % 4] ^ i & 0xFF for i, x in enumerate(decoded)])
     browsers = {Browser.CHROMIUM, Browser.WEBKIT, Browser.FIREFOX}
+    detections = []
     for i in range(0, len(decrypted), 2):
         detection = int.from_bytes(decrypted[i : i + 2], "big")
+        detections.append(decrypted[i : i + 2].hex())
         category = detection >> 12
         match category:
             case 0:  # filler
                 pass
-            case 1 | 2:  # webdriver
-                print("failed webdriver check", detection)
+            case 1:  # webdriver
+                # 10xx undetected-chromedriver
+                #   00 window.JSCompiler_renameProperty
+                # 11xx playwright
+                #   00 chromium (oncontentvisibilityautostatechanged)
+                #   02 webkit (onorientationchange)
+                # 1Fxx generic
+                #   00 something in window ending with `_Symbol`
+                print("failed webdriver check", hex(detection))
                 return BrowserCheckResult.AUTOMATED
             case 3:  # browser check
                 match detection:
@@ -559,6 +569,7 @@ def check_detections(
                 print("unknown detection", detection)
                 return BrowserCheckResult.TAMPERED
 
+    print("k", detections)
     if len(browsers) != 1:
         print("unable to identify browser", browsers)
         return BrowserCheckResult.SUSPICIOUS
