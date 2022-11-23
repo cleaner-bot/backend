@@ -15,6 +15,7 @@ class BrowserCheckResult(enum.Enum):
     SUSPICIOUS = 1
     TAMPERED = 2
     BAD_REQUEST = 3
+    AUTOMATED = 4
 
 
 class Browser(enum.Enum):
@@ -99,6 +100,9 @@ def browser_check(
         browserdata, base_seed, browser
     )
     fonts_result, fonts = check_fonts(browserdata, base_seed, platform)
+    rtt_result = check_connection_rtt(browserdata, base_seed)
+    browser_engine_result = check_browser_engine(browserdata, base_seed, browser)
+    detections_result = check_detections(browserdata, base_seed, browser)
 
     fingerprint = b"\x00".join(
         [
@@ -120,6 +124,9 @@ def browser_check(
         locale_result,
         locale_spoof_result,
         fonts_result,
+        rtt_result,
+        browser_engine_result,
+        detections_result,
     ]
 
     return max(results, key=lambda x: x.value), fingerprint
@@ -132,6 +139,11 @@ def check_time(browserdata: BrowserData) -> BrowserCheckResult:
         return BrowserCheckResult.TAMPERED
     elif browserdata["t2"] > browserdata["t3"]:
         print("submit before current", browserdata)
+        return BrowserCheckResult.TAMPERED
+    
+    expected_tc = (browserdata["t1"] * browserdata["t2"]) ^ browserdata["t3"] & 0xff ^ browserdata["s"]
+    if expected_tc != browserdata["tc"]:
+        print("incorrect tc", browserdata, expected_tc)
         return BrowserCheckResult.TAMPERED
 
     time_delta = abs(browserdata["t2"] - datetime.now().timestamp() * 1000)
@@ -436,10 +448,116 @@ def check_fonts(
     return BrowserCheckResult.OK, fonts
 
 
+def check_connection_rtt(browserdata: BrowserData, base_seed: bytes) -> BrowserCheckResult:
+    key = crc32(bytes([x ^ 155 for x in base_seed])).to_bytes(4, "big")
+    decoded = b64parse(browserdata["r"])
+    if decoded is None:
+        print("r is not valid base64", browserdata)
+        return BrowserCheckResult.BAD_REQUEST
+    rtt = decoded[1] ^ key[3]
+    if rtt == 0:
+        return BrowserCheckResult.SUSPICIOUS
+    return BrowserCheckResult.OK
+
+
+def check_browser_engine(browserdata: BrowserData, base_seed: bytes, browser: Browser) -> BrowserCheckResult:
+    key = crc32(bytes([x ^ 71 for x in base_seed])).to_bytes(4, "big")
+    decoded = b64parse(browserdata["e"])
+    if decoded is None:
+        print("e is not valid base64", browserdata)
+        return BrowserCheckResult.BAD_REQUEST
+    
+    decrypted = bytes([x ^ key[i % 4] for i, x in enumerate(decoded)])
+    tofixed_length = decoded[0] ^ key[2]
+    print("e", decrypted, tofixed_length)
+
+    tofixed_data = decoded[1:1 + tofixed_length]
+
+    match tofixed_data:
+        case b"toFixed() digits argument must be between 0 and 100":
+            tofixed_browser = Browser.CHROMIUM  # V8
+        case b"precision -1 out of range":
+            tofixed_browser = Browser.FIREFOX  # SpiderMonkey
+        case b"toFixed() argument must be between 0 and 100":
+            tofixed_browser = Browser.WEBKIT  # JavaScriptCore
+        case _:
+            print("unknown engine", tofixed_data)
+            return BrowserCheckResult.SUSPICIOUS
+    
+    if tofixed_browser != browser:
+        print("mismatching engine browser and actual", tofixed_browser, browser, tofixed_data)
+        return BrowserCheckResult.TAMPERED
+    
+    native_data = decoded[1 + tofixed_length:]
+    match native_data:
+        case b"function () { [native code] }":
+            native_browser = {Browser.CHROMIUM}
+        case b"function () {\n    [native code]\n}":
+            native_browser = {Browser.WEBKIT, Browser.FIREFOX}
+        case _:
+            print("unknown engine", native_data)
+            return BrowserCheckResult.SUSPICIOUS
+    
+    if browser not in native_browser:
+        print("mismatching engine browser and actual", native_browser, browser, native_data)
+        return BrowserCheckResult.TAMPERED
+
+    return BrowserCheckResult.OK
+
+
+def check_detections(browserdata: BrowserData, base_seed: bytes, browser: Browser) -> BrowserCheckResult:
+    key = crc32(bytes([x ^ 142 for x in base_seed])).to_bytes(4, "big")
+    decoded = b64parse(browserdata["k"])
+    if decoded is None:
+        print("k is not valid base64", browserdata)
+        return BrowserCheckResult.BAD_REQUEST
+    elif len(decoded) % 2 == 1 or len(decoded) < 20:
+        print("k has incorrect length", len(decoded), decoded, browserdata)
+        return BrowserCheckResult.BAD_REQUEST
+    
+    decrypted = bytes([x ^ key[i % 4] ^ i & 0xff for i, x in enumerate(decoded)])
+    browsers = {Browser.CHROMIUM, Browser.WEBKIT, Browser.FIREFOX}
+    for i in range(0, len(decrypted), 2):
+        detection = int.from_bytes(decrypted[i:i + 1], "big")
+        category = detection >> 12
+        match category:
+            case 0:  # filler
+                pass
+            case 1, 2:  # webdriver
+                print("failed webdriver check", detection)
+                return BrowserCheckResult.AUTOMATED
+            case 3:  # browser check
+                match detection:
+                    case 0x3000, 0x3001:
+                        browsers &= {Browser.CHROMIUM}
+                    case 0x3002:
+                        browsers &= {Browser.FIREFOX}
+                    case 0x3003:
+                        browsers &= {Browser.WEBKIT}
+                    case _:
+                        print("unknown brower check", detection, hex(detection))
+                        return BrowserCheckResult.TAMPERED
+            case _:
+                print("unknown detection", detection)
+                return BrowserCheckResult.TAMPERED
+
+    if len(browsers) != 1:
+        print("unable to identify browser", browsers)
+        return BrowserCheckResult.SUSPICIOUS
+    
+    expected_browser, = browsers
+    if browser != expected_browser:
+        print("browser mismatch", expected_browser, browser)
+        return BrowserCheckResult.SUSPICIOUS
+
+    return BrowserCheckResult.OK
+
+
 class BrowserData(typing.TypedDict):
     t1: int
     t2: int
     t3: int
+    tc: int
     s: int
     m1: str
     m2: str
@@ -448,3 +566,6 @@ class BrowserData(typing.TypedDict):
     l2: str
     l3: str
     f: str
+    r: str
+    e: str
+    k: str

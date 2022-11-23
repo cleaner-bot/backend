@@ -68,6 +68,15 @@ async def post_human_challenge(
     elif "type" not in payload:
         return text("Missing 'type' in body.payload", 400)
 
+    browser_result, browser_fingerprint = browser_check(
+        request, typing.cast(BrowserData, browserdata)
+    )
+    print("browser check", browser_result, browser_fingerprint)
+    if browser_result == BrowserCheckResult.BAD_REQUEST:
+        return text("Bad request", 400)
+    elif browser_result == BrowserCheckResult.AUTOMATED:
+        return text("Automated browser", 400)
+
     result: HTTPResponse | RequiredCaptchaType
     if payload["type"] == "j":  # joinguard
         result, unique = await check_join_guard(request, database, payload)
@@ -86,12 +95,6 @@ async def post_human_challenge(
     if result in (RequiredCaptchaType.CAPTCHA, RequiredCaptchaType.RAID):
         captchas.append("hcaptcha")
 
-    browser_result, browser_fingerprint = browser_check(
-        request, typing.cast(BrowserData, browserdata)
-    )
-    print("browser check", browser_result, browser_fingerprint)
-    if browser_result == BrowserCheckResult.BAD_REQUEST:
-        return text("Bad request", 400)
     if browser_result != BrowserCheckResult.OK:
         if result == RequiredCaptchaType.RAID:
             return text("Temporarily unavailable.", 403)
