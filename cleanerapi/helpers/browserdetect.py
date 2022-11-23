@@ -471,7 +471,7 @@ def check_browser_engine(browserdata: BrowserData, base_seed: bytes, browser: Br
     tofixed_length = decoded[0] ^ key[2]
     print("e", decrypted, tofixed_length)
 
-    tofixed_data = decoded[1:1 + tofixed_length]
+    tofixed_data = decrypted[1:1 + tofixed_length]
 
     match tofixed_data:
         case b"toFixed() digits argument must be between 0 and 100":
@@ -488,7 +488,7 @@ def check_browser_engine(browserdata: BrowserData, base_seed: bytes, browser: Br
         print("mismatching engine browser and actual", tofixed_browser, browser, tofixed_data)
         return BrowserCheckResult.TAMPERED
     
-    native_data = decoded[1 + tofixed_length:]
+    native_data = decrypted[1 + tofixed_length:]
     match native_data:
         case b"function () { [native code] }":
             native_browser = {Browser.CHROMIUM}
@@ -520,6 +520,7 @@ def check_detections(browserdata: BrowserData, base_seed: bytes, browser: Browse
     for i in range(0, len(decrypted), 2):
         detection = int.from_bytes(decrypted[i:i + 1], "big")
         category = detection >> 12
+        print(hex(detection), category)
         match category:
             case 0:  # filler
                 pass
