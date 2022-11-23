@@ -541,12 +541,12 @@ def check_detections(
         match category:
             case 0:  # filler
                 pass
-            case 1, 2:  # webdriver
+            case 1 | 2:  # webdriver
                 print("failed webdriver check", detection)
                 return BrowserCheckResult.AUTOMATED
             case 3:  # browser check
                 match detection:
-                    case 0x3000, 0x3001:
+                    case 0x3000 | 0x3001:
                         browsers &= {Browser.CHROMIUM}
                     case 0x3002:
                         browsers &= {Browser.FIREFOX}
