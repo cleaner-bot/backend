@@ -548,9 +548,9 @@ def check_detections(
                 match detection:
                     case 0x3000 | 0x3001:
                         browsers &= {Browser.CHROMIUM}
-                    case 0x3002:
+                    case 0x3002 | 0x3003 | 0x3005:
                         browsers &= {Browser.FIREFOX}
-                    case 0x3003:
+                    case 0x3004:
                         browsers &= {Browser.WEBKIT}
                     case _:
                         print("unknown brower check", detection, hex(detection))
