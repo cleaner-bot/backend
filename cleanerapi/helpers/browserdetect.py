@@ -140,8 +140,10 @@ def check_time(browserdata: BrowserData) -> BrowserCheckResult:
     elif browserdata["t2"] > browserdata["t3"]:
         print("submit before current", browserdata)
         return BrowserCheckResult.TAMPERED
-    
-    expected_tc = (browserdata["t1"] ^ browserdata["t2"] ^ browserdata["t3"] ^ browserdata["s"]) & 0xffff
+
+    expected_tc = (
+        browserdata["t1"] ^ browserdata["t2"] ^ browserdata["t3"] ^ browserdata["s"]
+    ) & 0xFFFF
     if expected_tc != browserdata["tc"]:
         print("incorrect tc", browserdata, expected_tc)
         return BrowserCheckResult.TAMPERED
@@ -448,7 +450,9 @@ def check_fonts(
     return BrowserCheckResult.OK, fonts
 
 
-def check_connection_rtt(browserdata: BrowserData, base_seed: bytes) -> BrowserCheckResult:
+def check_connection_rtt(
+    browserdata: BrowserData, base_seed: bytes
+) -> BrowserCheckResult:
     key = crc32(bytes([x ^ 155 for x in base_seed])).to_bytes(4, "big")
     decoded = b64parse(browserdata["r"])
     if decoded is None:
@@ -460,18 +464,20 @@ def check_connection_rtt(browserdata: BrowserData, base_seed: bytes) -> BrowserC
     return BrowserCheckResult.OK
 
 
-def check_browser_engine(browserdata: BrowserData, base_seed: bytes, browser: Browser) -> BrowserCheckResult:
+def check_browser_engine(
+    browserdata: BrowserData, base_seed: bytes, browser: Browser
+) -> BrowserCheckResult:
     key = crc32(bytes([x ^ 71 for x in base_seed])).to_bytes(4, "big")
     decoded = b64parse(browserdata["e"])
     if decoded is None:
         print("e is not valid base64", browserdata)
         return BrowserCheckResult.BAD_REQUEST
-    
+
     decrypted = bytes([x ^ key[i % 4] for i, x in enumerate(decoded)])
     tofixed_length = decoded[0] ^ key[2]
     print("e", decrypted, tofixed_length)
 
-    tofixed_data = decrypted[1:1 + tofixed_length]
+    tofixed_data = decrypted[1 : 1 + tofixed_length]
 
     match tofixed_data:
         case b"toFixed() digits argument must be between 0 and 100":
@@ -483,12 +489,17 @@ def check_browser_engine(browserdata: BrowserData, base_seed: bytes, browser: Br
         case _:
             print("unknown engine", tofixed_data)
             return BrowserCheckResult.SUSPICIOUS
-    
+
     if tofixed_browser != browser:
-        print("mismatching engine browser and actual", tofixed_browser, browser, tofixed_data)
+        print(
+            "mismatching engine browser and actual",
+            tofixed_browser,
+            browser,
+            tofixed_data,
+        )
         return BrowserCheckResult.TAMPERED
-    
-    native_data = decrypted[1 + tofixed_length:]
+
+    native_data = decrypted[1 + tofixed_length :]
     match native_data:
         case b"function () { [native code] }":
             native_browser = {Browser.CHROMIUM}
@@ -497,15 +508,22 @@ def check_browser_engine(browserdata: BrowserData, base_seed: bytes, browser: Br
         case _:
             print("unknown engine", native_data)
             return BrowserCheckResult.SUSPICIOUS
-    
+
     if browser not in native_browser:
-        print("mismatching engine browser and actual", native_browser, browser, native_data)
+        print(
+            "mismatching engine browser and actual",
+            native_browser,
+            browser,
+            native_data,
+        )
         return BrowserCheckResult.TAMPERED
 
     return BrowserCheckResult.OK
 
 
-def check_detections(browserdata: BrowserData, base_seed: bytes, browser: Browser) -> BrowserCheckResult:
+def check_detections(
+    browserdata: BrowserData, base_seed: bytes, browser: Browser
+) -> BrowserCheckResult:
     key = crc32(bytes([x ^ 142 for x in base_seed])).to_bytes(4, "big")
     decoded = b64parse(browserdata["k"])
     if decoded is None:
@@ -514,11 +532,11 @@ def check_detections(browserdata: BrowserData, base_seed: bytes, browser: Browse
     elif len(decoded) % 2 == 1 or len(decoded) < 20:
         print("k has incorrect length", len(decoded), decoded, browserdata)
         return BrowserCheckResult.BAD_REQUEST
-    
-    decrypted = bytes([x ^ key[i % 4] ^ i & 0xff for i, x in enumerate(decoded)])
+
+    decrypted = bytes([x ^ key[i % 4] ^ i & 0xFF for i, x in enumerate(decoded)])
     browsers = {Browser.CHROMIUM, Browser.WEBKIT, Browser.FIREFOX}
     for i in range(0, len(decrypted), 2):
-        detection = int.from_bytes(decrypted[i:i + 2], "big")
+        detection = int.from_bytes(decrypted[i : i + 2], "big")
         category = detection >> 12
         match category:
             case 0:  # filler
@@ -544,8 +562,8 @@ def check_detections(browserdata: BrowserData, base_seed: bytes, browser: Browse
     if len(browsers) != 1:
         print("unable to identify browser", browsers)
         return BrowserCheckResult.SUSPICIOUS
-    
-    expected_browser, = browsers
+
+    (expected_browser,) = browsers
     if browser != expected_browser:
         print("browser mismatch", expected_browser, browser)
         return BrowserCheckResult.SUSPICIOUS
