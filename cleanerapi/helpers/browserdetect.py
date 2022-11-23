@@ -141,7 +141,7 @@ def check_time(browserdata: BrowserData) -> BrowserCheckResult:
         print("submit before current", browserdata)
         return BrowserCheckResult.TAMPERED
     
-    expected_tc = ((browserdata["t1"] * browserdata["t2"]) ^ browserdata["t3"] ^ browserdata["s"]) & 0xffff
+    expected_tc = (browserdata["t1"] ^ browserdata["t2"] ^ browserdata["t3"] ^ browserdata["s"]) & 0xffff
     if expected_tc != browserdata["tc"]:
         print("incorrect tc", browserdata, expected_tc)
         return BrowserCheckResult.TAMPERED
