@@ -102,6 +102,7 @@ def browser_check(
 
     fingerprint = b"\x00".join(
         [
+            browserdata["t1"].to_bytes(8, "big"),
             browser.name.encode(),
             platform.name.encode(),
             url,
