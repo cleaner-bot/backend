@@ -518,9 +518,8 @@ def check_detections(browserdata: BrowserData, base_seed: bytes, browser: Browse
     decrypted = bytes([x ^ key[i % 4] ^ i & 0xff for i, x in enumerate(decoded)])
     browsers = {Browser.CHROMIUM, Browser.WEBKIT, Browser.FIREFOX}
     for i in range(0, len(decrypted), 2):
-        detection = int.from_bytes(decrypted[i:i + 1], "big")
+        detection = int.from_bytes(decrypted[i:i + 2], "big")
         category = detection >> 12
-        print(hex(detection), category)
         match category:
             case 0:  # filler
                 pass
