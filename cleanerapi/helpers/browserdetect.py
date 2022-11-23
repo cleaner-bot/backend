@@ -383,21 +383,34 @@ def check_fonts(
     if decoded is None:
         print("f is not valid base64", browserdata)
         return BrowserCheckResult.BAD_REQUEST, set()
-    offset = 0
+    font_size = decoded[0] ^ key[1]
+    base_font_checksum = int.from_bytes(
+        bytes([x ^ key[1] for x in decoded[1:5]]), "big"
+    )
+    print("font info", font_size, base_font_checksum)
+
+    offset = 5
     fonts = set()
     while offset < len(decoded):
         length = decoded[offset] ^ 15 ^ key[3]
+        # this can be used for fingerprinting in the future
+        font_checksum = int.from_bytes(
+            bytes(
+                [x ^ key[i % 4] for i, x in enumerate(decoded[offset + 1 : offset + 5])]
+            ),
+            "big",
+        )
         decrypted = bytes(
             [
-                x ^ key[(offset + 1 + i) % 4]
-                for i, x in enumerate(decoded[offset + 1 : offset + 1 + length])
+                x ^ key[(offset + 5 + i) % 4]
+                for i, x in enumerate(decoded[offset + 5 : offset + 5 + length])
             ]
         )
         offset += 1 + length
         try:
             font = decrypted.decode()
         except UnicodeDecodeError:
-            print("invalid f value", length, decrypted)
+            print("invalid f value", length, font_checksum, decrypted)
             return BrowserCheckResult.TAMPERED, set()
         fonts.add(font)
 
