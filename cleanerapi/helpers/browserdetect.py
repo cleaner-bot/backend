@@ -403,17 +403,17 @@ def check_fonts(
 
     print("f", fonts)
     if fonts & APPLE_FONTS:
-        if platform in {Platform.MAC, Platform.IOS}:
+        if platform not in {Platform.MAC, Platform.IOS}:
             print("apple fonts, but not apple platform", platform)
             return BrowserCheckResult.TAMPERED, fonts
 
     elif fonts & WINDOWS_FONTS:
-        if platform == Platform.WINDOWS:
+        if platform != Platform.WINDOWS:
             print("windows fonts, but not windows platform", platform)
             return BrowserCheckResult.TAMPERED, fonts
 
     elif fonts & LINUX_FONTS:
-        if platform == Platform.LINUX:
+        if platform != Platform.LINUX:
             print("linux fonts, but not linux platform", platform)
             return BrowserCheckResult.TAMPERED, fonts
 
