@@ -130,6 +130,9 @@ def check_time(browserdata: BrowserData) -> BrowserCheckResult:
     if browserdata["t1"] >= browserdata["t2"]:
         print("current before page load", browserdata)
         return BrowserCheckResult.TAMPERED
+    elif browserdata["t2"] > browserdata["t3"]:
+        print("submit before current", browserdata)
+        return BrowserCheckResult.TAMPERED
 
     time_delta = abs(browserdata["t2"] - datetime.now().timestamp() * 1000)
     if time_delta > 60_000:
@@ -384,13 +387,8 @@ def check_fonts(
     if decoded is None:
         print("f is not valid base64", browserdata)
         return BrowserCheckResult.BAD_REQUEST, set()
-    font_size = decoded[0] ^ key[1]
-    base_font_checksum = int.from_bytes(
-        bytes([x ^ key[1] for x in decoded[1:5]]), "big"
-    )
-    print("font info", font_size, base_font_checksum)
 
-    offset = 5
+    offset = 0
     fonts = set()
     while offset < len(decoded):
         length = decoded[offset] ^ 15 ^ key[3]
@@ -441,6 +439,7 @@ def check_fonts(
 class BrowserData(typing.TypedDict):
     t1: int
     t2: int
+    t3: int
     s: int
     m1: str
     m2: str
