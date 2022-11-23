@@ -406,7 +406,7 @@ def check_fonts(
                 for i, x in enumerate(decoded[offset + 5 : offset + 5 + length])
             ]
         )
-        offset += 1 + length
+        offset += 5 + length
         try:
             font = decrypted.decode()
         except UnicodeDecodeError:
