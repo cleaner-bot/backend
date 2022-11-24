@@ -198,7 +198,7 @@ async def verify(
 
             elif challenge_provider == "pow":
                 token = raw_token[:-4].decode()
-                if verify_pow(token):
+                if verify_pow(token, chl_signature):
                     provider_index += 1
 
     if provider_index >= len(captcha_providers):
