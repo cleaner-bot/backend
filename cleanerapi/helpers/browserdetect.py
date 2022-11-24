@@ -608,14 +608,17 @@ def check_picasso(
 
         expected_checksum = crc32(decrypted_stage1[i : i + 8])
         if expected_checksum != checksum:
+            print("fp has incorrect checksum", fp, checksum, expected_checksum)
             return BrowserCheckResult.TAMPERED, 0
 
         fingerprints.add(fp)
 
     if len(fingerprints) != 1:
+        print("fp too many", fingerprints)
         return BrowserCheckResult.SUSPICIOUS, 0
 
     (fp,) = fingerprints
+    print("fp", fp)
     return BrowserCheckResult.OK, fp
 
 
