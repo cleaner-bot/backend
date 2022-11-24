@@ -591,7 +591,7 @@ def check_picasso(
     browserdata: BrowserData, base_seed: bytes
 ) -> tuple[BrowserCheckResult, int]:
     key = crc32(bytes([x ^ 99 for x in base_seed])).to_bytes(4, "big")
-    decoded = b64parse(browserdata["k"])
+    decoded = b64parse(browserdata["fp"])
     if decoded is None:
         print("fp is not valid base64", browserdata)
         return BrowserCheckResult.BAD_REQUEST, 0
