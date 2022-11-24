@@ -82,6 +82,12 @@ async def post_human_challenge(
     elif browser_result == BrowserCheckResult.AUTOMATED:
         return text("Automated browser detected", 400)
 
+    picasso_matching = await database.incr(f"fp:picasso:{picasso_fingerprint}")
+    if picasso_matching == 0:
+        await database.expire(f"fp:picasso:{picasso_fingerprint}", 300)
+    elif picasso_matching > 30:
+        return text("Browser ratelimit reached", 429)
+
     result: HTTPResponse | RequiredCaptchaType
     if payload["type"] == "j":  # joinguard
         result, unique = await check_join_guard(request, database, payload)
