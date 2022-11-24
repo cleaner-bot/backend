@@ -94,7 +94,7 @@ def verify_button(token: str) -> bool:
     if delta_x > 4:
         print("button - too much x delta", delta_x, all_x)
         return False
-    elif delta_y:
+    elif delta_y > 4:
         print("button - too much y delta", delta_y, all_y)
         return False
 
