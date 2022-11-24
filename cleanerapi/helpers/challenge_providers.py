@@ -88,8 +88,8 @@ def verify_button(token: str) -> bool:
             return False
 
     all_x, all_y = zip(*coordinates)
-    delta_x = offset_x + sum(map(int, all_x)) / 3
-    delta_y = offset_y + sum(map(int, all_y)) / 3
+    delta_x = abs(offset_x - sum(map(int, all_x)) / 3)
+    delta_y = abs(offset_y - sum(map(int, all_y)) / 3)
 
     if delta_x > 4:
         print("button - too much x delta", delta_x, all_x)
