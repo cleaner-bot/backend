@@ -341,7 +341,7 @@ async def check_verification(
     elif not await get_config_field(database, guild_id, "verification_enabled"):
         return text("Guild does not have verification enabled", 409), ""
 
-    return RequiredCaptchaType.CAPTCHA, f"v|{user_id}|{guild_id}"
+    return RequiredCaptchaType.DEFAULT, f"v|{user_id}|{guild_id}"
 
 
 async def complete_verification(
