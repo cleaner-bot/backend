@@ -96,9 +96,7 @@ async def post_human_challenge(
         return result  # bad request
     assert unique is not None
 
-    captchas = ["turnstile"]
-    if crc32(browser_fingerprint) & 1:
-        captchas.append("button")
+    captchas = ["button", "turnstile"]
 
     if browser_result != BrowserCheckResult.OK:
         if result == RequiredCaptchaType.RAID:
