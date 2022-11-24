@@ -95,7 +95,7 @@ async def post_human_challenge(
         return result  # bad request
     assert unique is not None
 
-    captchas = ["button", "turnstile"]
+    captchas = ["pow", "button", "turnstile"]
     if result in (RequiredCaptchaType.CAPTCHA, RequiredCaptchaType.RAID):
         captchas.append("hcaptcha")
 
@@ -233,8 +233,18 @@ async def verify(
                 "cdata": signature.hex(),
             }
         )
+
     elif challenge_provider == "hcaptcha":
         challenge["captcha"]["sitekey"] = request.app.config.HCAPTCHA_SITEKEY
+
+    elif challenge_provider == "pow":
+        challenge["captcha"].update(
+            {
+                "algorithm": "SHA-256",
+                "difficulty": 17,
+                "prefix": challenge["d"]["h"],
+            }
+        )
 
     return json(challenge, 403)
 

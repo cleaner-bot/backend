@@ -1,3 +1,5 @@
+import json
+import hashlib
 import typing
 from binascii import crc32
 
@@ -98,6 +100,27 @@ def verify_button(token: str) -> bool:
         print("button - too much y delta", delta_y, all_y)
         return False
 
+    return True
+
+
+def verify_pow(token: str, prefix: bytes, difficulty: int = 17) -> bool:
+    try:
+        data = json.loads(token)
+    except json.decoder.JSONDecodeError:
+        print("pow - invalid json", token)
+        return False
+
+    result = data.get("result", None)
+    if result is None or not isinstance(result, int) or not 0xFFFFFFFF >= result >= 0:
+        print("pow - invalid pow result", result)
+        return False
+
+    digest = hashlib.sha256(prefix + result.to_bytes(4, "big")).digest()
+    value = int.from_bytes(digest[-difficulty // 8 :], "big")
+
+    if value & ((1 << difficulty) - 1):
+        print("pow - not solved", bin(value))
+        return False
     return True
 
 
