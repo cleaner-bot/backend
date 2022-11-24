@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 
 from coredis import Redis
-from sanic import Blueprint, HTTPResponse, Request, json, text
+from sanic import Blueprint, HTTPResponse, Request, text
 from sanic.response import empty
 from sanic_ext import openapi, validate
 

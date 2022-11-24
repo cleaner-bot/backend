@@ -1,7 +1,7 @@
 import typing
 
 from coredis import Redis
-from sanic import Blueprint, HTTPResponse, Request, json, text
+from sanic import Blueprint, HTTPResponse, Request, json
 from sanic_ext import openapi
 
 from ...helpers.auth import get_user, is_developer
@@ -19,9 +19,9 @@ async def get_user_me(request: Request, database: Redis[bytes]) -> HTTPResponse:
     user = typing.cast(dict[str, str | bool], await get_user(request, database))
     if is_developer(request.ctx.user_token.user_id):
         user["is_dev"] = True
-    user[
-        "has_mfa"
-    ] = request.ctx.user_token.is_mfa_valid() and request.ctx.user_token.is_fingerprint_valid(
-        request
+    mfa_valid = (
+        request.ctx.user_token.is_mfa_valid()
+        and request.ctx.user_token.is_fingerprint_valid(request)
     )
+    user["has_mfa"] = mfa_valid
     return json(user)

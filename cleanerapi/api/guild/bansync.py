@@ -1,4 +1,3 @@
-import string
 import typing
 
 from coredis import Redis
