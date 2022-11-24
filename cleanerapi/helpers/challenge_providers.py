@@ -68,10 +68,10 @@ def verify_button(token: str) -> bool:
         return False
 
     offset_x, offset_y, page_x, page_y, x, y, scroll_x, scroll_y, top, left = values
-    page_x -= top
-    page_y -= left
-    x -= scroll_x - top
-    y -= scroll_y - left
+    page_x -= left
+    page_y -= top
+    x -= scroll_x + left
+    y -= scroll_y + top
     if top <= 0:
         print("button - invalid top", top)
     elif top <= 0:
