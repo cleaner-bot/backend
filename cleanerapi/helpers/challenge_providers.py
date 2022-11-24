@@ -50,9 +50,10 @@ def verify_button(token: str) -> bool:
         return False
     secret_bytes = bytes([x ^ 0x86 ^ i for i, x in enumerate(decoded[:8])])
     secret = crc32(secret_bytes)
+    print("button - secret", secret)
     trust = decoded[9] ^ (secret >> 16) & 0xFF
     if trust & 0x0F:
-        print("button - click not trusted")
+        print("button - click not trusted", trust)
         return False
     values = []
     for i in range(9, len(decoded), 2):
