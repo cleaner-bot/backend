@@ -96,16 +96,17 @@ async def post_human_challenge(
         return result  # bad request
     assert unique is not None
 
-    captchas = ["pow", "button", "turnstile"]
-    if result in (RequiredCaptchaType.CAPTCHA, RequiredCaptchaType.RAID):
-        captchas.append("hcaptcha")
+    captchas = ["turnstile"]
+    if crc32(browser_fingerprint) & 1:
+        captchas.append("button")
 
     if browser_result != BrowserCheckResult.OK:
         if result == RequiredCaptchaType.RAID:
             return text("Temporarily unavailable.", 403)
-        captchas.append("hcaptcha")
+        captchas.extend(("button", "hcaptcha"))
         if browser_result == BrowserCheckResult.TAMPERED:
-            captchas.extend(("turnstile", "hcaptcha"))
+            # naughty boy, throw everything at him
+            captchas.extend(("turnstile", "button", "pow", "hcaptcha"))
 
     if await is_proxy(request, client, database):
         # dont allow proxies during raids
@@ -113,6 +114,11 @@ async def post_human_challenge(
             return text("Temporarily unavailable.", 403)
 
         captchas.append("hcaptcha")
+
+    if result == RequiredCaptchaType.CAPTCHA:
+        captchas.append("hcaptcha")
+    elif result == RequiredCaptchaType.RAID:
+        captchas.extend(("pow", "hcaptcha"))
 
     if r := await verify(request, captchas, body.get("c"), unique, browser_fingerprint):
         return r
