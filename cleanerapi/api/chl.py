@@ -83,7 +83,7 @@ async def post_human_challenge(
         return text("Automated browser detected", 400)
 
     picasso_matching = await database.incr(f"fp:picasso:{picasso_fingerprint}")
-    if picasso_matching == 0:
+    if picasso_matching == 1:
         await database.expire(f"fp:picasso:{picasso_fingerprint}", 300)
     elif picasso_matching > 30:
         return text("Browser ratelimit reached", 429)
