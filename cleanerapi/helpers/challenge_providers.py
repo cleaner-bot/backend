@@ -35,7 +35,7 @@ async def verify_turnstile(
     )
     data = typing.cast(TurnstileResponse, res.json())
     print("turnstile", data, expected_cdata)
-    if expected_cdata != data["cdata"]:
+    if expected_cdata != data.get("cdata", ""):
         return False
     return data["success"]
 
