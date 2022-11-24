@@ -66,7 +66,7 @@ LINUX_FONTS = {
 
 def browser_check(
     request: Request, browserdata: BrowserData
-) -> tuple[BrowserCheckResult, bytes]:
+) -> tuple[BrowserCheckResult, bytes, int]:
     # check if payload makes sense
     browserdata_shape = {
         k: typing.ForwardRef(type(v).__name__) for k, v in browserdata.items()
@@ -74,7 +74,7 @@ def browser_check(
     # using a string compare cuz everything else just does not work
     if str(browserdata_shape) != str(BrowserData.__annotations__):
         print("shape of browserdata does not match", browserdata_shape, browserdata)
-        return BrowserCheckResult.BAD_REQUEST, b""
+        return BrowserCheckResult.BAD_REQUEST, b"", 0
 
     time_valid = check_time(browserdata)
     sequence_valid = check_sequence(browserdata)
@@ -82,7 +82,7 @@ def browser_check(
         time_valid == BrowserCheckResult.TAMPERED
         or sequence_valid == BrowserCheckResult.TAMPERED
     ):
-        return BrowserCheckResult.BAD_REQUEST, b""
+        return BrowserCheckResult.BAD_REQUEST, b"", 0
 
     base_seed = bytearray((browserdata["t2"] & 0xFFFF_FFFF).to_bytes(4, "big"))
     base_seed[0] ^= browserdata["s"] >> 8
@@ -103,6 +103,7 @@ def browser_check(
     rtt_result = check_connection_rtt(browserdata, base_seed)
     browser_engine_result = check_browser_engine(browserdata, base_seed, browser)
     detections_result = check_detections(browserdata, base_seed, browser)
+    picasso_result, picasso_fingerprint = check_picasso(browserdata, base_seed)
 
     fingerprint = b"\x00".join(
         [
@@ -112,6 +113,7 @@ def browser_check(
             url,
             locale,
             locale_spoof,
+            picasso_fingerprint.to_bytes(4, "big"),
             *map(str.encode, fonts),
         ]
     )
@@ -127,9 +129,10 @@ def browser_check(
         rtt_result,
         browser_engine_result,
         detections_result,
+        picasso_result,
     ]
 
-    return max(results, key=lambda x: x.value), fingerprint
+    return max(results, key=lambda x: x.value), fingerprint, picasso_fingerprint
 
 
 def check_time(browserdata: BrowserData) -> BrowserCheckResult:
@@ -544,15 +547,17 @@ def check_detections(
         match category:
             case 0:  # filler
                 pass
-            case 1:  # webdriver
+            case 1:  # automated browser
                 # 10xx undetected-chromedriver
                 #   00 window.JSCompiler_renameProperty
                 # 11xx playwright
                 #   00 chromium (oncontentvisibilityautostatechanged)
                 #   02 webkit (onorientationchange)
+                # 1E00 plugins
+                #   00 nopecha (recaptcha auto open trap)
                 # 1Fxx generic
                 #   00 something in window ending with `_Symbol`
-                print("failed webdriver check", hex(detection))
+                print("failed automated browser check", hex(detection))
                 return BrowserCheckResult.AUTOMATED
             case 3:  # browser check
                 match detection:
@@ -582,6 +587,38 @@ def check_detections(
     return BrowserCheckResult.OK
 
 
+def check_picasso(
+    browserdata: BrowserData, base_seed: bytes
+) -> tuple[BrowserCheckResult, int]:
+    key = crc32(bytes([x ^ 99 for x in base_seed])).to_bytes(4, "big")
+    decoded = b64parse(browserdata["k"])
+    if decoded is None:
+        print("fp is not valid base64", browserdata)
+        return BrowserCheckResult.BAD_REQUEST, 0
+    elif len(decoded) % 12 != 0 or len(decoded) < 24:
+        print("fp has incorrect length", len(decoded), decoded, browserdata)
+        return BrowserCheckResult.BAD_REQUEST, 0
+
+    decrypted_stage1 = bytes([x ^ key[i % 4] ^ i & 0xFF for i, x in enumerate(decoded)])
+    fingerprints = set()
+    for i in range(0, len(decrypted_stage1), 12):
+        rkey = int.from_bytes(decrypted_stage1[i : i + 4], "big") ^ 0xD0BED0AA
+        fp = int.from_bytes(decrypted_stage1[i + 4 : i + 8], "big") ^ rkey
+        checksum = int.from_bytes(decrypted_stage1[i + 8 : i + 12], "big") ^ 0xFBE2088E
+
+        expected_checksum = crc32(decrypted_stage1[i : i + 8])
+        if expected_checksum != checksum:
+            return BrowserCheckResult.TAMPERED, 0
+
+        fingerprints.add(fp)
+
+    if len(fingerprints) != 1:
+        return BrowserCheckResult.SUSPICIOUS, 0
+
+    (fp,) = fingerprints
+    return BrowserCheckResult.OK, fp
+
+
 class BrowserData(typing.TypedDict):
     t1: int
     t2: int
@@ -598,3 +635,4 @@ class BrowserData(typing.TypedDict):
     r: str
     e: str
     k: str
+    fp: str
