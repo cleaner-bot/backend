@@ -20,7 +20,11 @@ from sanic_ext import openapi
 from ..helpers.auth import UserInfo, get_user_guilds, parse_user_token
 from ..helpers.based import b64parse
 from ..helpers.browserdetect import BrowserCheckResult, BrowserData, browser_check
-from ..helpers.challenge_providers import verify_hcaptcha, verify_turnstile
+from ..helpers.challenge_providers import (
+    verify_hcaptcha,
+    verify_turnstile,
+    verify_button,
+)
 from ..helpers.fingerprint import fingerprint
 from ..helpers.rpc import rpc_call
 from ..helpers.settings import get_config_field, get_entitlement_field
@@ -91,7 +95,7 @@ async def post_human_challenge(
         return result  # bad request
     assert unique is not None
 
-    captchas = ["turnstile"]
+    captchas = ["button", "turnstile"]
     if result in (RequiredCaptchaType.CAPTCHA, RequiredCaptchaType.RAID):
         captchas.append("hcaptcha")
 
@@ -184,6 +188,11 @@ async def verify(
                 if await verify_turnstile(
                     request.app, token, request.ip, chl_signature.hex()
                 ):
+                    provider_index += 1
+
+            elif challenge_provider == "button":
+                token = raw_token[:-4].decode()
+                if verify_button(token):
                     provider_index += 1
 
     if provider_index >= len(captcha_providers):
