@@ -24,6 +24,7 @@ from ..helpers.challenge_providers import (
     verify_hcaptcha,
     verify_turnstile,
     verify_button,
+    verify_pow,
 )
 from ..helpers.fingerprint import fingerprint
 from ..helpers.rpc import rpc_call
@@ -193,6 +194,11 @@ async def verify(
             elif challenge_provider == "button":
                 token = raw_token[:-4].decode()
                 if verify_button(token):
+                    provider_index += 1
+
+            elif challenge_provider == "pow":
+                token = raw_token[:-4].decode()
+                if verify_pow(token):
                     provider_index += 1
 
     if provider_index >= len(captcha_providers):
