@@ -73,7 +73,7 @@ async def post_human_challenge(
     elif "type" not in payload:
         return text("Missing 'type' in body.payload", 400)
 
-    if database.exists((f"cache:ip:{request.ip}:banned",)):
+    if await database.exists((f"cache:ip:{request.ip}:banned",)):
         return text("Ratelimit reached", 429)
 
     browser_result, browser_fingerprint, picasso_fingerprint = browser_check(
