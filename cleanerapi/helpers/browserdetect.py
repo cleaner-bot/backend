@@ -540,6 +540,7 @@ def check_detections(
     decrypted = bytes([x ^ key[i % 4] ^ i & 0xFF for i, x in enumerate(decoded)])
     browsers = {Browser.CHROMIUM, Browser.WEBKIT, Browser.FIREFOX}
     detections = []
+    results: list[BrowserCheckResult] = []
     for i in range(0, len(decrypted), 2):
         detection = int.from_bytes(decrypted[i : i + 2], "big")
         detections.append(decrypted[i : i + 2].hex())
@@ -553,12 +554,23 @@ def check_detections(
                 # 11xx playwright
                 #   00 chromium (oncontentvisibilityautostatechanged)
                 #   02 webkit (onorientationchange)
-                # 1E00 plugins
+                # 1Axx stealth scripts
+                #   00 "utils" in scope
+                #   01 userAgent property
+                #   02 webdriver property
+                #   03 webdriver=undefined
+                #   04 webdriver != false (safari & firefox)
+                #   05 toString proxy (only firefox)
+                # 1Exx plugins
                 #   00 nopecha (recaptcha auto open trap)
                 # 1Fxx generic
                 #   00 something in window ending with `_Symbol`
+                #   01 navigator.webdriver is truthy
                 print("failed automated browser check", hex(detection))
-                return BrowserCheckResult.AUTOMATED
+                results.append(BrowserCheckResult.AUTOMATED)
+            case 2:  # suspicious stuff
+                # 0000 pdf disabled
+                results.append(BrowserCheckResult.SUSPICIOUS)
             case 3:  # browser check
                 match detection:
                     case 0x3000 | 0x3001:
@@ -569,20 +581,23 @@ def check_detections(
                         browsers &= {Browser.WEBKIT}
                     case _:
                         print("unknown brower check", detection, hex(detection))
-                        return BrowserCheckResult.TAMPERED
+                        results.append(BrowserCheckResult.TAMPERED)
             case _:
                 print("unknown detection", detection)
-                return BrowserCheckResult.TAMPERED
+                results.append(BrowserCheckResult.TAMPERED)
 
     print("k", detections)
     if len(browsers) != 1:
         print("unable to identify browser", browsers)
-        return BrowserCheckResult.SUSPICIOUS
+        results.append(BrowserCheckResult.SUSPICIOUS)
+    else:
+        (expected_browser,) = browsers
+        if browser != expected_browser:
+            print("browser mismatch", expected_browser, browser)
+            results.append(BrowserCheckResult.SUSPICIOUS)
 
-    (expected_browser,) = browsers
-    if browser != expected_browser:
-        print("browser mismatch", expected_browser, browser)
-        return BrowserCheckResult.SUSPICIOUS
+    if results:
+        return max(results, key=lambda x: x.value)
 
     return BrowserCheckResult.OK
 
