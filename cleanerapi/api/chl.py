@@ -92,7 +92,7 @@ async def post_human_challenge(
 
     if browser_result == BrowserCheckResult.AUTOMATED:
         await database.set(f"cache:ip:{request.ip}:banned", "1", ex=60)
-        return text("Automated browser detected", 403)
+        return text("Automation software detected", 403)
 
     result: HTTPResponse | RequiredCaptchaType
     if payload["type"] == "j":  # joinguard
