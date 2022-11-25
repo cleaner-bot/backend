@@ -60,7 +60,7 @@ def verify_button(token: str) -> bool:
     for i in range(9, len(decoded), 2):
         v1 = decoded[i] ^ (secret >> 24)
         v2 = decoded[i + 1] ^ (secret & 0xFF)
-        value = (v1 << 8) + v2
+        value = int.from_bytes([v1, v2], "big", signed=True)
         values.append(value)
         secret ^= (value ^ (value << 8) ^ (value << 16) ^ (value << 24)) & 0xFFFFFFFF
 
