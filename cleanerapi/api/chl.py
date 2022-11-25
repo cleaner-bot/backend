@@ -184,6 +184,12 @@ async def verify(
             svm_challenge = rnd.randbytes(2048)
             key = svm(svm_challenge)
             raw_token = bytes(x ^ key[i & 0xFF] for i, x in enumerate(chl_token))
+
+            try:
+                token = raw_token[:-4].decode()
+            except UnicodeDecodeError:
+                token = None
+
             provider_index = body["i"]
             challenge_provider = captcha_providers[provider_index]
             if (
@@ -191,6 +197,7 @@ async def verify(
                     4, "big", signed=False
                 )
                 != chl_token[-4:]
+                or token is None
             ):
                 pass
 
@@ -198,24 +205,20 @@ async def verify(
                 pass
 
             elif challenge_provider == "hcaptcha":
-                token = raw_token[:-4].decode()
                 if await verify_hcaptcha(request.app, token, request.ip):
                     provider_index += 1
 
             elif challenge_provider == "turnstile":
-                token = raw_token[:-4].decode()
                 if await verify_turnstile(
                     request.app, token, request.ip, chl_signature.hex()
                 ):
                     provider_index += 1
 
             elif challenge_provider == "button":
-                token = raw_token[:-4].decode()
-                if verify_button(token):
+                if verify_button(token, int.from_bytes(chl_signature[:6], "big")):
                     provider_index += 1
 
             elif challenge_provider == "pow":
-                token = raw_token[:-4].decode()
                 if verify_pow(token, chl_signature):
                     provider_index += 1
 
