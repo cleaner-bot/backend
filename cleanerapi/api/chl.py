@@ -111,7 +111,7 @@ async def post_human_challenge(
     if browser_result != BrowserCheckResult.OK:
         if result == RequiredCaptchaType.RAID:
             return text("Temporarily unavailable.", 403)
-        captchas.extend(("button", "hcaptcha"))
+        captchas.extend(("pow", "hcaptcha"))
         if browser_result == BrowserCheckResult.TAMPERED:
             # naughty boy, throw everything at him
             captchas.extend(("turnstile", "button", "pow", "hcaptcha"))
