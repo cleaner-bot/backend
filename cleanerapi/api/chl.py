@@ -73,24 +73,26 @@ async def post_human_challenge(
     elif "type" not in payload:
         return text("Missing 'type' in body.payload", 400)
 
-    if await database.exists((f"cache:ip:{request.ip}:banned",)):
-        return text("Ratelimit reached", 429)
-
     browser_result, browser_fingerprint, picasso_fingerprint = browser_check(
         request, typing.cast(BrowserData, browserdata)
     )
     print("browser check", browser_result, browser_fingerprint)
     if browser_result == BrowserCheckResult.BAD_REQUEST:
         return text("Bad request", 400)
-    elif browser_result == BrowserCheckResult.AUTOMATED:
-        await database.set(f"cache:ip:{request.ip}:banned", "1", ex=60)
-        return text("Automated browser detected", 403)
 
     picasso_matching = await database.incr(f"cache:picasso:{picasso_fingerprint}")
     if picasso_matching == 1:
         await database.expire(f"cache::picasso:{picasso_fingerprint}", 300)
-    elif picasso_matching > 30:
-        return text("Browser ratelimit reached", 429)
+
+    if (
+        await database.exists((f"cache:ip:{request.ip}:banned",))
+        or picasso_matching > 30
+    ):
+        return text("Ratelimit reached", 429)
+
+    if browser_result == BrowserCheckResult.AUTOMATED:
+        await database.set(f"cache:ip:{request.ip}:banned", "1", ex=60)
+        return text("Automated browser detected", 403)
 
     result: HTTPResponse | RequiredCaptchaType
     if payload["type"] == "j":  # joinguard
