@@ -241,7 +241,7 @@ async def verify(
 
     challenge_provider = captcha_providers[provider_index]
     challenge: dict[str, dict[str, str | int]] = {
-        "captcha": {"provider": challenge_provider},
+        "c": {"p": challenge_provider},
         "d": {
             # "fp": request_fingerprint.hex(),
             "svm": b64encode(svm_challenge).decode().strip("="),
@@ -253,26 +253,26 @@ async def verify(
     }
 
     if challenge_provider == "turnstile":
-        challenge["captcha"].update(
+        challenge["c"].update(
             {
-                "sitekey": request.app.config.TURNSTILE_SITEKEY,
-                "action": unique.split("|")[0],
-                "cdata": signature.hex(),
+                "sk": request.app.config.TURNSTILE_SITEKEY,
+                "a": unique.split("|")[0],
+                "c": signature.hex(),
             }
         )
 
     elif challenge_provider == "hcaptcha":
-        challenge["captcha"]["sitekey"] = request.app.config.HCAPTCHA_SITEKEY
+        challenge["c"]["sk"] = request.app.config.HCAPTCHA_SITEKEY
 
     elif challenge_provider == "button":
-        challenge["captcha"]["nonce"] = int.from_bytes(signature[:6], "big")
+        challenge["c"]["n"] = int.from_bytes(signature[:6], "big")
 
     elif challenge_provider == "pow":
-        challenge["captcha"].update(
+        challenge["c"].update(
             {
-                "algorithm": "SHA-256",
-                "difficulty": 17,
-                "prefix": challenge["d"]["h"],
+                "a": "SHA-256",
+                "d": 17,
+                "p": challenge["d"]["h"],
             }
         )
 
