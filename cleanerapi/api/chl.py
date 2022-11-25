@@ -167,6 +167,7 @@ async def verify(
         and (chl_token := b64parse(body["token"])) is not None
         and isinstance(body.get("i", ""), int)
         and isinstance(body.get("t", ""), int)
+        and body.get("p", "") in ("turnstile", "hcaptcha", "button", "pow")
     ):
         expected_signature = hmac.new(
             bytes.fromhex(request.app.config.BACKEND_AUTH_SECRET),
@@ -198,6 +199,7 @@ async def verify(
                 )
                 != chl_token[-4:]
                 or token is None
+                or challenge_provider != body["p"]
             ):
                 pass
 
