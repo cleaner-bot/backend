@@ -543,8 +543,9 @@ def check_detections(
     results: list[BrowserCheckResult] = []
     for i in range(0, len(decrypted), 2):
         detection = int.from_bytes(decrypted[i : i + 2], "big")
-        detections.append(decrypted[i : i + 2].hex())
         category = detection >> 12
+        if category:
+            detections.append(decrypted[i : i + 2].hex())
         match category:
             case 0:  # filler
                 pass

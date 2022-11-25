@@ -177,6 +177,7 @@ async def verify(
             + chl_svm_seed,
             "sha256",
         ).digest()
+        print("h", chl_signature.hex(), expected_signature.hex())
         if hmac.compare_digest(expected_signature, chl_signature):
             rnd = random.Random(chl_svm_seed)
             svm_challenge = rnd.randbytes(2048)
