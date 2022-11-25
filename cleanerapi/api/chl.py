@@ -82,7 +82,7 @@ async def post_human_challenge(
 
     picasso_matching = await database.incr(f"cache:picasso:{picasso_fingerprint}")
     if picasso_matching == 1:
-        await database.expire(f"cache::picasso:{picasso_fingerprint}", 300)
+        await database.expire(f"cache:picasso:{picasso_fingerprint}", 300)
 
     if (
         await database.exists((f"cache:ip:{request.ip}:banned",))
