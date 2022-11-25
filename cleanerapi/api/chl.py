@@ -156,6 +156,7 @@ async def verify(
     timestamp = int(datetime.now().timestamp() * 1000)
     request_fingerprint = fingerprint(request, "chl")
     provider_index = 0
+    print("verify h", unique, request_fingerprint, browser_fingerprint)
     if (
         isinstance(body, dict)
         and body.get("s1", "") != ""
