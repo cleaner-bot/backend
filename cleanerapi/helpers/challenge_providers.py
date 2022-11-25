@@ -45,13 +45,14 @@ async def verify_turnstile(
     return data["success"]
 
 
-def verify_button(token: str) -> bool:
+def verify_button(token: str, nonce: int) -> bool:
     decoded = b64parse(token)
     if decoded is None:
         print("button - not valid b64", token)
         return False
     secret_bytes = bytes([x ^ 0x86 ^ i for i, x in enumerate(decoded[:8])])
     secret = crc32(secret_bytes)
+    secret ^= nonce & 0xFFFFFFFF
     trust = decoded[8] ^ (secret >> 16) & 0xFF
     if trust & 0x0F:
         print("button - click not trusted", trust)

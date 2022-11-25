@@ -261,6 +261,9 @@ async def verify(
     elif challenge_provider == "hcaptcha":
         challenge["captcha"]["sitekey"] = request.app.config.HCAPTCHA_SITEKEY
 
+    elif challenge_provider == "button":
+        challenge["captcha"]["nonce"] = int.from_bytes(signature[:6], "big")
+
     elif challenge_provider == "pow":
         challenge["captcha"].update(
             {
