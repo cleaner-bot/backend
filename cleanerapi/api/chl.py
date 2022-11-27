@@ -274,7 +274,7 @@ async def verify(
             {
                 "a": "SHA-256",
                 "d": 17,
-                "p": challenge["d"]["h"],
+                "s": challenge["d"]["h"],
             }
         )
 
