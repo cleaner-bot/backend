@@ -72,29 +72,29 @@ async def post_human_challenge(
         return text("Missing 'p' in body", 400)
     elif "t" not in payload:
         return text("Missing 't' in body.p", 400)
-    elif browserdata is None:
-        return text("Missing 'd' in body", 400)
+    # elif browserdata is None:
+    #     return text("Missing 'd' in body", 400)
 
-    browser_result, browser_fingerprint, picasso_fingerprint = browser_check(
-        request, typing.cast(BrowserData, browserdata)
-    )
-    print("browser check", browser_result, browser_fingerprint)
-    if browser_result == BrowserCheckResult.BAD_REQUEST:
-        return text("Bad request", 400)
+    # browser_result, browser_fingerprint, picasso_fingerprint = browser_check(
+    #     request, typing.cast(BrowserData, browserdata)
+    # )
+    # print("browser check", browser_result, browser_fingerprint)
+    # if browser_result == BrowserCheckResult.BAD_REQUEST:
+    #     return text("Bad request", 400)
 
-    picasso_matching = await database.incr(f"cache:picasso:{picasso_fingerprint}")
-    if picasso_matching == 1:
-        await database.expire(f"cache:picasso:{picasso_fingerprint}", 300)
+    # picasso_matching = await database.incr(f"cache:picasso:{picasso_fingerprint}")
+    # if picasso_matching == 1:
+    #     await database.expire(f"cache:picasso:{picasso_fingerprint}", 300)
 
-    if (
-        await database.exists((f"cache:ip:{request.ip}:banned",))
-        or picasso_matching > 30
-    ):
-        return text("Ratelimit reached", 429)
+    # if (
+    #     await database.exists((f"cache:ip:{request.ip}:banned",))
+    #     or picasso_matching > 30
+    # ):
+    #     return text("Ratelimit reached", 429)
 
-    if browser_result == BrowserCheckResult.AUTOMATED:
-        await database.set(f"cache:ip:{request.ip}:banned", "1", ex=60)
-        return text("Automation software detected", 403)
+    # if browser_result == BrowserCheckResult.AUTOMATED:
+    #     await database.set(f"cache:ip:{request.ip}:banned", "1", ex=60)
+    #     return text("Automation software detected", 403)
 
     result: HTTPResponse | RequiredCaptchaType
     if payload["t"] == "j":  # joinguard
@@ -112,13 +112,13 @@ async def post_human_challenge(
 
     captchas = ["button", "turnstile"]
 
-    if browser_result != BrowserCheckResult.OK:
-        if result == RequiredCaptchaType.RAID:
-            return text("Temporarily unavailable.", 403)
-        captchas.extend(("pow", "hcaptcha"))
-        if browser_result == BrowserCheckResult.TAMPERED:
-            # naughty boy, throw everything at him
-            captchas.extend(("turnstile", "button", "pow", "hcaptcha"))
+    # if browser_result != BrowserCheckResult.OK:
+    #     if result == RequiredCaptchaType.RAID:
+    #         return text("Temporarily unavailable.", 403)
+    #     captchas.extend(("pow", "hcaptcha"))
+    #     if browser_result == BrowserCheckResult.TAMPERED:
+    #         # naughty boy, throw everything at him
+    #         captchas.extend(("turnstile", "button", "pow", "hcaptcha"))
 
     if await is_proxy(request, client, database):
         # dont allow proxies during raids
@@ -132,7 +132,7 @@ async def post_human_challenge(
     elif result == RequiredCaptchaType.RAID:
         captchas.extend(("pow", "hcaptcha"))
 
-    if r := await verify(request, captchas, body.get("c"), unique, browser_fingerprint):
+    if r := await verify(request, captchas, body.get("c"), unique, b""):
         return r
 
     if payload["t"] == "j":  # joinguard
