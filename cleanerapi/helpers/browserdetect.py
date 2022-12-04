@@ -551,7 +551,7 @@ def check_detections(
                 pass
             case 1:  # automated browser
                 # 10xx undetected-chromedriver
-                #   00 window.JSCompiler_renameProperty
+                #   00 window.objectToInspect
                 # 11xx playwright
                 #   00 chromium (oncontentvisibilityautostatechanged)
                 #   02 webkit (onorientationchange)
@@ -566,7 +566,8 @@ def check_detections(
                 #   00 nopecha (recaptcha auto open trap)
                 # 1Fxx generic
                 #   00 something in window ending with `_Symbol`
-                #   01 navigator.webdriver is truthy
+                #   01 something in iframe window ending with `_Symbol`
+                #   02 navigator.webdriver is truthy
                 print("failed automated browser check", hex(detection))
                 results.append(BrowserCheckResult.AUTOMATED)
             case 2:  # suspicious stuff
