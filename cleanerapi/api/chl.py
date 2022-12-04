@@ -69,9 +69,11 @@ async def post_human_challenge(
     payload: dict[str, str] = body.get("p")
 
     if payload is None:
-        return text("Missing 'payload' in body", 400)
-    elif "type" not in payload:
-        return text("Missing 'type' in body.payload", 400)
+        return text("Missing 'p' in body", 400)
+    elif "t" not in payload:
+        return text("Missing 't' in body.p", 400)
+    elif browserdata is None:
+        return text("Missing 'd' in body", 400)
 
     browser_result, browser_fingerprint, picasso_fingerprint = browser_check(
         request, typing.cast(BrowserData, browserdata)
@@ -95,14 +97,14 @@ async def post_human_challenge(
         return text("Automation software detected", 403)
 
     result: HTTPResponse | RequiredCaptchaType
-    if payload["type"] == "j":  # joinguard
+    if payload["t"] == "j":  # joinguard
         result, unique = await check_join_guard(request, database, payload)
-    elif payload["type"] == "v":  # verification
+    elif payload["t"] == "v":  # verification
         result, unique = await check_verification(request, database, payload)
-    elif payload["type"] == "sv":  # super verification
+    elif payload["t"] == "sv":  # super verification
         result, unique = await check_super_verification(request, database, payload)
     else:
-        return text("Invalid 'type' in body.payload", 400)
+        return text("Invalid 't' in body.p", 400)
 
     if isinstance(result, HTTPResponse):
         return result  # bad request
@@ -133,11 +135,11 @@ async def post_human_challenge(
     if r := await verify(request, captchas, body.get("c"), unique, browser_fingerprint):
         return r
 
-    if payload["type"] == "j":  # joinguard
+    if payload["t"] == "j":  # joinguard
         result = await complete_join_guard(request, database, payload)
-    elif payload["type"] == "v":  # verification
+    elif payload["t"] == "v":  # verification
         result = await complete_verification(request, database, payload)
-    elif payload["type"] == "sv":  # super verificaiton
+    elif payload["t"] == "sv":  # super verificaiton
         result = await complete_super_verification(request, database, payload)
 
     if isinstance(result, HTTPResponse):
@@ -307,11 +309,11 @@ async def is_proxy(
 async def check_join_guard(
     request: Request, database: Redis[bytes], payload: dict[str, str]
 ) -> tuple[HTTPResponse | RequiredCaptchaType, str]:
-    guild = payload.get("guild")
+    guild = payload.get("g")
     if guild is None:
-        return text("Missing 'guild' in body.payload"), ""
+        return text("Missing 'g' in body.p"), ""
     elif not guild.isdigit():
-        return text("Not an integer: body.payload.guild", 400), ""
+        return text("Not an integer: body.p.g", 400), ""
 
     request.ctx.user_token = user_token = await parse_user_token(request, database)
     if user_token is None:
@@ -374,9 +376,9 @@ async def complete_join_guard(
 async def check_verification(
     request: Request, database: Redis[bytes], payload: dict[str, str]
 ) -> tuple[HTTPResponse | RequiredCaptchaType, str]:
-    flow = payload.get("flow")
+    flow = payload.get("f")
     if flow is None:
-        return text("Missing 'flow' in body.payload"), ""
+        return text("Missing 'f' in body.p"), ""
 
     user_id, guild_id = parse_flow(request.app, flow)
 
@@ -415,11 +417,11 @@ async def complete_verification(
 async def check_super_verification(
     request: Request, database: Redis[bytes], payload: dict[str, str]
 ) -> tuple[HTTPResponse | RequiredCaptchaType, str]:
-    guild = payload.get("guild")
+    guild = payload.get("g")
     if guild is None:
-        return text("Missing 'guild' in body.payload"), ""
+        return text("Missing 'g' in body.p"), ""
     elif not guild.isdigit():
-        return text("Not an integer: body.payload.guild", 400), ""
+        return text("Not an integer: body.p.g", 400), ""
 
     request.ctx.user_token = user_token = await parse_user_token(request, database)
     if user_token is None:
@@ -476,21 +478,21 @@ def parse_flow(app: Sanic, flow: str) -> tuple[int, int]:
     try:
         raw = urlsafe_b64decode(flow + "=" * (len(flow) % 4))
     except ValueError:
-        raise SanicException("body.payload.flow is not base64 encoded", 400)
+        raise SanicException("body.p.f is not base64 encoded", 400)
 
     if len(raw) != 52:
-        raise SanicException("body.payload.flow must be 52 bytes long", 400)
+        raise SanicException("body.p.f must be 52 bytes long", 400)
 
     user_id = int.from_bytes(raw[0:8], "big")
     guild_id = int.from_bytes(raw[8:16], "big")
     checksum = int.from_bytes(raw[48:52], "big")
     if crc32(raw[:48]) != checksum:
-        raise SanicException("Failed to valdiate body.payload.flow", 400)
+        raise SanicException("Failed to valdiate body.p.f", 400)
 
     expected_hash = hmac.digest(
         bytes.fromhex(app.config.BACKEND_VERIFICATION_SECRET), raw[:16], "sha256"
     )
     if not hmac.compare_digest(expected_hash, raw[16:48]):
-        raise SanicException("Failed to valdiate body.payload.flow", 400)
+        raise SanicException("Failed to valdiate body.p.f", 400)
 
     return user_id, guild_id
