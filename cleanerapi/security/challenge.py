@@ -86,8 +86,8 @@ def generate_response(
 
 
 class ChallengeRequest(BaseModel):
-    c: ChallengeRequestCaptchaData | None
-    b: list[int | str] | None
+    c: ChallengeRequestCaptchaData
+    b: list[int | str]
     p: typing.Any
 
 
@@ -127,10 +127,13 @@ async def verify_request(
         return generate_response(request, requirement.unique, 0, captchas)
 
     if (
-        cr.c is None
-        or cr.b is None
-        or len(cr.b) % 2 == 1
-        or any(not isinstance(x, int) for x in cr.b[1::2])
+        len(cr.b) % 2 == 1
+        or not all(isinstance(x, int) for x in cr.b[1::2])
+        or not all(
+            checksum(cr.b[i]) ^ 0x735A20DC ^ crc32(bytes([i, 0x0C, 0x88, 0x59, 0xDD]))
+            != cr.b[i + 1]
+            for i in range(len(cr.b), 2)
+        )
         or not reduce(xor, cr.b) != cr.c.vc
     ):
         return generate_response(request, requirement.unique, 0, captchas)
