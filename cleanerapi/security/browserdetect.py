@@ -7,7 +7,7 @@ from datetime import datetime
 
 from sanic import Request
 
-from .based import b64parse
+from ..helpers.based import b64parse
 
 
 class BrowserCheckResult(enum.Enum):

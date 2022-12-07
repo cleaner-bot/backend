@@ -1,43 +1,23 @@
 from __future__ import annotations
 
-import enum
 import hmac
-import os
-import random
-import typing
-from base64 import b64encode, urlsafe_b64decode
+from base64 import urlsafe_b64decode
 from binascii import crc32
-from datetime import datetime
 
 from coredis import Redis
 from hikari import OAuth2Scope
 from httpx import AsyncClient
-from sanic import Blueprint, HTTPResponse, Request, Sanic, json, text
+from sanic import Blueprint, HTTPResponse, Request, Sanic, text
 from sanic.exceptions import SanicException
 from sanic.response import empty
 from sanic_ext import openapi
 
 from ..helpers.auth import UserInfo, get_user_guilds, parse_user_token
-from ..helpers.based import b64parse
-from ..helpers.browserdetect import BrowserCheckResult, BrowserData, browser_check
-from ..helpers.challenge_providers import (
-    verify_button,
-    verify_hcaptcha,
-    verify_pow,
-    verify_turnstile,
-)
-from ..helpers.fingerprint import fingerprint
 from ..helpers.rpc import rpc_call
 from ..helpers.settings import get_config_field, get_entitlement_field
-from ..helpers.svm import svm
+from ..security.challenge import CaptchaRequirement, SecurityLevel, verify_request
 
 bp = Blueprint("HumanVerificationPlatform", "/chl", version=1)
-
-
-class RequiredCaptchaType(enum.Enum):
-    DEFAULT = enum.auto()
-    CAPTCHA = enum.auto()
-    RAID = enum.auto()
 
 
 class VerificationResponse:
@@ -65,7 +45,6 @@ async def post_human_challenge(
 ) -> HTTPResponse:
     body = request.json
 
-    browserdata: dict[str, str | int] = body.get("d")
     payload: dict[str, str] = body.get("p")
 
     if payload is None:
@@ -96,43 +75,19 @@ async def post_human_challenge(
     #     await database.set(f"cache:ip:{request.ip}:banned", "1", ex=60)
     #     return text("Automation software detected", 403)
 
-    result: HTTPResponse | RequiredCaptchaType
+    result: HTTPResponse | CaptchaRequirement
     if payload["t"] == "j":  # joinguard
-        result, unique = await check_join_guard(request, database, payload)
+        result = await check_join_guard(request, database, payload)
     elif payload["t"] == "v":  # verification
-        result, unique = await check_verification(request, database, payload)
+        result = await check_verification(request, database, payload)
     elif payload["t"] == "sv":  # super verification
-        result, unique = await check_super_verification(request, database, payload)
+        result = await check_super_verification(request, database, payload)
     else:
         return text("Invalid 't' in body.p", 400)
 
     if isinstance(result, HTTPResponse):
         return result  # bad request
-    assert unique is not None
-
-    captchas = ["button", "turnstile"]
-
-    # if browser_result != BrowserCheckResult.OK:
-    #     if result == RequiredCaptchaType.RAID:
-    #         return text("Temporarily unavailable.", 403)
-    #     captchas.extend(("pow", "hcaptcha"))
-    #     if browser_result == BrowserCheckResult.TAMPERED:
-    #         # naughty boy, throw everything at him
-    #         captchas.extend(("turnstile", "button", "pow", "hcaptcha"))
-
-    if await is_proxy(request, client, database):
-        # dont allow proxies during raids
-        if result == RequiredCaptchaType.RAID:
-            return text("Temporarily unavailable.", 403)
-
-        captchas.append("hcaptcha")
-
-    if result == RequiredCaptchaType.CAPTCHA:
-        captchas.append("hcaptcha")
-    elif result == RequiredCaptchaType.RAID:
-        captchas.extend(("pow", "hcaptcha"))
-
-    if r := await verify(request, captchas, body.get("c"), unique, b""):
+    if r := await verify_request(request, result):
         return r
 
     if payload["t"] == "j":  # joinguard
@@ -148,192 +103,34 @@ async def post_human_challenge(
     return empty()
 
 
-async def verify(
-    request: Request,
-    captcha_providers: list[str],
-    body: typing.Any,
-    unique: str,
-    browser_fingerprint: bytes,
-) -> HTTPResponse | None:
-    timestamp = int(datetime.now().timestamp() * 1000)
-    request_fingerprint = fingerprint(request, "chl")
-    provider_index = 0
-    print("verify h", unique, request_fingerprint, browser_fingerprint)
-    if (
-        isinstance(body, dict)
-        and body.get("s1", "") != ""
-        and (chl_svm_seed := b64parse(body["s1"])) is not None
-        and body.get("h", "") != ""
-        and (chl_signature := b64parse(body["h"])) is not None
-        and body.get("token", "") != ""
-        and (chl_token := b64parse(body["token"])) is not None
-        and isinstance(body.get("i", ""), int)
-        and isinstance(body.get("t", ""), int)
-        and body.get("p", "") in ("turnstile", "hcaptcha", "button", "pow")
-    ):
-        expected_signature = hmac.new(
-            bytes.fromhex(request.app.config.BACKEND_AUTH_SECRET),
-            unique.encode()
-            + body["i"].to_bytes(4, "big")
-            + body["t"].to_bytes(8, "big")
-            + request_fingerprint
-            + browser_fingerprint
-            + chl_svm_seed,
-            "sha256",
-        ).digest()
-        print("h", chl_signature.hex(), expected_signature.hex())
-        if hmac.compare_digest(expected_signature, chl_signature):
-            rnd = random.Random(chl_svm_seed)
-            svm_challenge = rnd.randbytes(2048)
-            key = svm(svm_challenge)
-            raw_token = bytes(x ^ key[i & 0xFF] for i, x in enumerate(chl_token))
-
-            try:
-                token = raw_token[:-4].decode()
-            except UnicodeDecodeError:
-                token = None
-
-            provider_index = body["i"]
-            challenge_provider = captcha_providers[provider_index]
-            if (
-                crc32(bytes(x ^ 0xFF for x in raw_token[:-4])).to_bytes(
-                    4, "big", signed=False
-                )
-                != chl_token[-4:]
-                or token is None
-                or challenge_provider != body["p"]
-            ):
-                pass
-
-            elif body["t"] < timestamp - 300_000:
-                pass
-
-            elif challenge_provider == "hcaptcha":
-                if await verify_hcaptcha(request.app, token, request.ip):
-                    provider_index += 1
-
-            elif challenge_provider == "turnstile":
-                if await verify_turnstile(
-                    request.app, token, request.ip, chl_signature.hex()
-                ):
-                    provider_index += 1
-
-            elif challenge_provider == "button":
-                if verify_button(token, int.from_bytes(chl_signature[:6], "big")):
-                    provider_index += 1
-
-            elif challenge_provider == "pow":
-                if verify_pow(token, chl_signature):
-                    provider_index += 1
-
-    if provider_index >= len(captcha_providers):
-        return None
-
-    svm_seed = os.urandom(32)
-    rnd = random.Random(svm_seed)
-    svm_challenge = rnd.randbytes(2048)
-    signature = hmac.new(
-        bytes.fromhex(request.app.config.BACKEND_AUTH_SECRET),
-        unique.encode()
-        + provider_index.to_bytes(4, "big")
-        + timestamp.to_bytes(8, "big")
-        + request_fingerprint
-        + browser_fingerprint
-        + svm_seed,
-        "sha256",
-    ).digest()
-
-    challenge_provider = captcha_providers[provider_index]
-    challenge: dict[str, dict[str, str | int]] = {
-        "c": {"p": challenge_provider},
-        "d": {
-            # "fp": request_fingerprint.hex(),
-            "svm": b64encode(svm_challenge).decode().strip("="),
-            "s1": b64encode(svm_seed).decode(),
-            "h": b64encode(signature).decode(),
-            "i": provider_index,
-            "t": timestamp,
-        },
-    }
-
-    if challenge_provider == "turnstile":
-        challenge["c"].update(
-            {
-                "sk": request.app.config.TURNSTILE_SITEKEY,
-                "a": unique.split("|")[0],
-                "c": signature.hex(),
-            }
-        )
-
-    elif challenge_provider == "hcaptcha":
-        challenge["c"]["sk"] = request.app.config.HCAPTCHA_SITEKEY
-
-    elif challenge_provider == "button":
-        challenge["c"]["n"] = int.from_bytes(signature[:6], "big")
-
-    elif challenge_provider == "pow":
-        challenge["c"].update(
-            {
-                "a": "SHA-256",
-                "d": 17,
-                "s": challenge["d"]["h"],
-            }
-        )
-
-    return json(challenge, 403)
-
-
-async def is_proxy(
-    request: Request, client: AsyncClient, database: Redis[bytes]
-) -> bool:
-    cached = await database.get(f"cache:ip:{request.ip}")
-    if cached is not None:
-        return cached == b"1"
-    asn = typing.cast(str, request.headers["X-Connecting-Asn"])
-    if await database.sismember("cache:hosting-asn", asn):
-        return True
-    # cannot use https without paying, wtf?
-    response = await client.get(
-        f"http://ip-api.com/json/{request.ip}?fields=status,mobile,proxy,hosting"
-    )
-    response.raise_for_status()
-    data = response.json()
-    print("ipcheck", data)
-    is_proxy = data["proxy"] or data["hosting"]
-    if data["hosting"]:
-        await database.sadd("cache:hosting-asn", (asn,))
-    await database.set(f"cache:ip:{request.ip}", "1" if is_proxy else "0", ex=60 * 60)
-    return bool(is_proxy)
-
-
 async def check_join_guard(
     request: Request, database: Redis[bytes], payload: dict[str, str]
-) -> tuple[HTTPResponse | RequiredCaptchaType, str]:
+) -> HTTPResponse | CaptchaRequirement:
     guild = payload.get("g")
     if guild is None:
-        return text("Missing 'g' in body.p"), ""
+        return text("Missing 'g' in body.p")
     elif not guild.isdigit():
-        return text("Not an integer: body.p.g", 400), ""
+        return text("Not an integer: body.p.g", 400)
 
     request.ctx.user_token = user_token = await parse_user_token(request, database)
     if user_token is None:
-        return text("Unauthorized", 401), ""
+        return text("Unauthorized", 401)
 
     if not await get_config_field(database, guild, "joinguard_enabled"):
-        return text("Join Guard is not enabled", 409), ""
+        return text("Join Guard is not enabled", 409)
     plan = await get_entitlement_field(database, guild, "plan")
     joinguard = await get_entitlement_field(database, guild, "joinguard")
     if plan < joinguard:
-        return text("Join Guard is not enabled", 409), ""
+        return text("Join Guard is not enabled", 409)
 
     tempbanned = await database.get(f"guild:{guild}:joinguard:{user_token.user_id}")
     if tempbanned is not None:
-        return text(tempbanned.decode(), 400), ""
+        return text(tempbanned.decode(), 400)
 
     guilds = await get_user_guilds(request, database)
 
     if any(x["id"] == guild for x in guilds):
-        return text("Already joined", 404), ""
+        return text("Already joined", 404)
 
     token, scopes = await database.hmget(
         f"user:{user_token.user_id}:oauth2", ("token", "scopes")
@@ -343,14 +140,14 @@ async def check_join_guard(
         or scopes is None
         or OAuth2Scope.GUILDS_JOIN not in scopes.decode().split(" ")
     ):
-        return text("Missing required scope", 401), ""
+        return text("Missing required scope", 401)
 
     if await database.scard(f"guild:{guild}:joinguard") >= 20:
-        return RequiredCaptchaType.RAID, f"j|{guild}"
+        return CaptchaRequirement(SecurityLevel.RAID, f"j|{guild}")
     elif await get_config_field(database, guild, "joinguard_captcha"):
-        return RequiredCaptchaType.CAPTCHA, f"j|{guild}"
+        return CaptchaRequirement(SecurityLevel.CAPTCHA, f"j|{guild}")
 
-    return RequiredCaptchaType.DEFAULT, f"j|{guild}"
+    return CaptchaRequirement(SecurityLevel.DEFAULT, f"j|{guild}")
 
 
 async def complete_join_guard(
@@ -375,10 +172,10 @@ async def complete_join_guard(
 
 async def check_verification(
     request: Request, database: Redis[bytes], payload: dict[str, str]
-) -> tuple[HTTPResponse | RequiredCaptchaType, str]:
+) -> HTTPResponse | CaptchaRequirement:
     flow = payload.get("f")
     if flow is None:
-        return text("Missing 'f' in body.p"), ""
+        return text("Missing 'f' in body.p")
 
     user_id, guild_id = parse_flow(request.app, flow)
 
@@ -386,15 +183,15 @@ async def check_verification(
         f"verification:external:{guild_id}-{user_id}"
     )
     if not flow_data:
-        return text("Already verified or link expired", 404), ""
+        return text("Already verified or link expired", 404)
 
     exists = await rpc_call(database, "dash:guild-check", (guild_id,))
     if not exists["ok"] or not exists["data"]:
-        return text("Guild not found", 404), ""
+        return text("Guild not found", 404)
     elif not await get_config_field(database, guild_id, "verification_enabled"):
-        return text("Guild does not have verification enabled", 409), ""
+        return text("Guild does not have verification enabled", 409)
 
-    return RequiredCaptchaType.DEFAULT, f"v|{user_id}|{guild_id}"
+    return CaptchaRequirement(SecurityLevel.DEFAULT, f"v|{user_id}|{guild_id}")
 
 
 async def complete_verification(
@@ -416,48 +213,52 @@ async def complete_verification(
 
 async def check_super_verification(
     request: Request, database: Redis[bytes], payload: dict[str, str]
-) -> tuple[HTTPResponse | RequiredCaptchaType, str]:
+) -> HTTPResponse | CaptchaRequirement:
     guild = payload.get("g")
     if guild is None:
-        return text("Missing 'g' in body.p"), ""
+        return text("Missing 'g' in body.p")
     elif not guild.isdigit():
-        return text("Not an integer: body.p.g", 400), ""
+        return text("Not an integer: body.p.g", 400)
 
     request.ctx.user_token = user_token = await parse_user_token(request, database)
     if user_token is None:
-        return text("Unauthorized", 401), ""
+        return text("Unauthorized", 401)
 
     if not await get_config_field(database, guild, "super_verification_enabled"):
-        return text("Super Verification is not enabled", 409), ""
+        return text("Super Verification is not enabled", 409)
 
     plan = await get_entitlement_field(database, guild, "plan")
     super_verification = await get_entitlement_field(
         database, guild, "super_verification"
     )
     if plan < super_verification:
-        return text("Super Verification is not enabled", 409), ""
+        return text("Super Verification is not enabled", 409)
 
     guilds = await get_user_guilds(request, database)
 
     if all(x["id"] != guild for x in guilds):
-        return text("User not in guild", 404), ""
+        return text("User not in guild", 404)
 
     jointime = await database.hget(
         f"guild:{guild}:super-verification", str(user_token.user_id)
     )
     if jointime is None:
-        return text("Already verified", 404), ""
+        return text("Already verified", 404)
 
     danger = await database.hlen(f"guild:{guild}:super-verification")
     if danger >= 20:
-        return RequiredCaptchaType.RAID, f"sv{user_token.user_id}|{guild}"
+        return CaptchaRequirement(SecurityLevel.RAID, f"sv{user_token.user_id}|{guild}")
     elif danger >= 10:
-        return RequiredCaptchaType.CAPTCHA, f"sv|{user_token.user_id}|{guild}"
+        return CaptchaRequirement(
+            SecurityLevel.CAPTCHA, f"sv|{user_token.user_id}|{guild}"
+        )
 
     if await get_config_field(database, guild, "super_verification_captcha"):
-        return RequiredCaptchaType.CAPTCHA, f"sv|{user_token.user_id}|{guild}"
+        return CaptchaRequirement(
+            SecurityLevel.CAPTCHA, f"sv|{user_token.user_id}|{guild}"
+        )
 
-    return RequiredCaptchaType.DEFAULT, f"sv|{user_token.user_id}|{guild}"
+    return CaptchaRequirement(SecurityLevel.DEFAULT, f"sv|{user_token.user_id}|{guild}")
 
 
 async def complete_super_verification(

@@ -10,7 +10,7 @@ from sanic import Blueprint, HTTPResponse, Request, json, text
 from sanic_ext import openapi, validate
 
 from ..helpers.auth import UserInfo, UserToken, create_user_token
-from ..helpers.fingerprint import fingerprint
+from ..security.fingerprint import fingerprint
 
 bp = Blueprint("OAuth2Platform", "/oauth2/d", version=1)
 required_scopes = (hikari.OAuth2Scope.IDENTIFY, hikari.OAuth2Scope.GUILDS)

@@ -13,7 +13,7 @@ from hikari.internal.time import utc_datetime
 from sanic import Request
 from sanic.exceptions import SanicException
 
-from .fingerprint import fingerprint
+from ..security.fingerprint import fingerprint
 from .lock import named_locks
 from .settings import get_config_field
 

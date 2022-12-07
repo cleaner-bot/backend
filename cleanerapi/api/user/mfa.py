@@ -34,8 +34,8 @@ from webauthn.registration.verify_registration_response import (
 )
 
 from ...helpers.auth import UserToken, create_user_token, get_user
-from ...helpers.fingerprint import fingerprint
 from ...helpers.totp import hotp
+from ...security.fingerprint import fingerprint
 
 bp = Blueprint("UserMFA", version=1)
 
