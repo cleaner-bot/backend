@@ -98,7 +98,7 @@ class Variable(typing.NamedTuple):
         elif self.is_bool():
             key = ekey.to_bytes(4, "big")
             data = [BOOLEAN_VALUES.index(self.value.lower())]
-            data.extend((x for x in random.randbytes(random.randrange(3, 15)) if x))
+            data.extend(random.randbytes(random.randrange(3, 15)))
             return (
                 base64.b64encode(bytes(x ^ key[i % 4] for i, x in enumerate(data)))
                 .decode()
@@ -108,7 +108,7 @@ class Variable(typing.NamedTuple):
             key = ekey.to_bytes(4, "big")
             data = bytearray(self.value.encode())
             data.append(0)
-            data.extend(random.randbytes(random.randrange(5, 30)))
+            data.extend((x for x in random.randbytes(random.randrange(5, 30)) if x))
             return (
                 base64.b64encode(bytes(x ^ key[i % 4] for i, x in enumerate(data)))
                 .decode()
