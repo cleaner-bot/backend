@@ -104,7 +104,7 @@ class ChallengeRequest(BaseModel):
 
 def checksum(value: int | str) -> int:
     if isinstance(value, int):
-        return crc32(value.to_bytes(4, "big", signed=True))
+        return crc32((value  & 0xffffffff).to_bytes(4, "big"))
     return crc32(value.encode())
 
 
@@ -136,7 +136,7 @@ async def verify_request(
             != cr.b[i + 1]
             for i in range(len(cr.b), 2)
         )
-        or not reduce(xor, map(checksum, cr.b)) != cr.c.vc
+        or not reduce(xor, map(checksum, cr.b)) != cr.c.vc & 0xffffffff
     ):
         return generate_response(request, requirement.unique, 0, captchas)
 
