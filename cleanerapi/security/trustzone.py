@@ -108,7 +108,7 @@ class Variable(typing.NamedTuple):
             key = ekey.to_bytes(4, "big")
             data = bytearray(self.value.encode())
             data.append(0)
-            data.extend((x for x in random.randbytes(random.randrange(5, 30)) if x > 0))
+            data.extend((x for x in random.randbytes(random.randrange(5, 30)) if x))
             return (
                 base64.b64encode(bytes(x ^ key[i % 4] for i, x in enumerate(data)))
                 .decode()
@@ -373,7 +373,7 @@ def decrypt(value: str | int, ekey: int) -> str | int | bool | None | _Undefined
         case 3:
             return UNDEFINED
         case _:
-            return data[1 : data[::-1].index(0)].decode()
+            return data[1 : -data[::-1].index(0) - 2].decode()
 
 
 checks: tuple[tuple[str, tuple[str, ...]], ...]
