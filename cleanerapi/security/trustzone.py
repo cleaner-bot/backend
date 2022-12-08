@@ -79,7 +79,9 @@ class Variable(typing.NamedTuple):
     value: str
 
     def is_number(self) -> bool:
-        return self.value.isdigit()
+        return self.value.isdigit() or (
+            self.value.startswith("-") and self.value[1:].isdigit()
+        )
 
     def is_string(self) -> bool:
         return self.value[0] == self.value[-1] and self.value[0] in ("'", '"')
@@ -291,16 +293,13 @@ class TrustCompiler:
         )
 
         raw_instructions = []
-        print("instructions:")
+        # print("instructions:")
         for instr in self.instructions:
             if instr.name == "jumptarget":
                 continue
             index = instruction_map.index(instr.name)
             raw_instructions.append(self.number_to_bits(index, required_bits_per_instr))
-            print(
-                f"  {len(''.join(raw_instructions)):>4} {index:>3} {instr.name}",
-                ", ".join(x.value for x in instr.arguments),
-            )
+            # print(f"  {len(''.join(raw_instructions)):>4} {index:>3} {instr.name}", ", ".join(x.value for x in instr.arguments))
             for arg in instr.arguments:
                 scope = variable_scope[arg.value]
                 raw_instructions.append(
@@ -363,7 +362,6 @@ def decrypt(value: str | int, ekey: int) -> str | int | bool | None | _Undefined
         return value ^ ekey
     key = ekey.to_bytes(4, "big")
     data = bytes([x ^ key[i % 4] for i, x in enumerate(base64.b64decode(value))])
-    print(data)
     match data[0]:
         case 0:
             return True
@@ -463,7 +461,8 @@ checks = (
             'index_store &date, &win, "Date"',
             "new &a, &date",
             "plus &a",
-            "set submit_time, &a",
+            'index_store &b, &a, "toString"',
+            "syscall submit_time, 1, &b, &a",
             "set &a, 0",
             "syscall _, 0, &submit_time",
         ),
