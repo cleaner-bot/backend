@@ -161,7 +161,7 @@ async def complete_join_guard(
     result = await rpc_call(
         database,
         "joinguard",
-        int(payload["guild"]),
+        int(payload["g"]),
         request.ctx.user_token.user_id,
         token.decode(),
     )
@@ -197,7 +197,7 @@ async def check_verification(
 async def complete_verification(
     request: Request, database: Redis[bytes], payload: dict[str, str]
 ) -> HTTPResponse:
-    user_id, guild_id = parse_flow(request.app, payload["flow"])
+    user_id, guild_id = parse_flow(request.app, payload["f"])
 
     result = await rpc_call(
         database,
