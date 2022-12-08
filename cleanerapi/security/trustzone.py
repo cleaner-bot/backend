@@ -98,7 +98,7 @@ class Variable(typing.NamedTuple):
         elif self.is_bool():
             key = ekey.to_bytes(4, "big")
             data = [BOOLEAN_VALUES.index(self.value.lower())]
-            data.extend(random.randbytes(random.randrange(3, 15)))
+            data.extend((x for x in random.randbytes(random.randrange(3, 15)) if x))
             return (
                 base64.b64encode(bytes(x ^ key[i % 4] for i, x in enumerate(data)))
                 .decode()
@@ -106,10 +106,11 @@ class Variable(typing.NamedTuple):
             )
         elif self.is_string():
             key = ekey.to_bytes(4, "big")
+            data = bytearray(self.value.encode())
+            data.append(0)
+            data.extend(random.randbytes(random.randrange(5, 30)))
             return (
-                base64.b64encode(
-                    bytes(x ^ key[i % 4] for i, x in enumerate(self.value.encode()))
-                )
+                base64.b64encode(bytes(x ^ key[i % 4] for i, x in enumerate(data)))
                 .decode()
                 .strip("=")
             )
@@ -372,7 +373,7 @@ def decrypt(value: str | int, ekey: int) -> str | int | bool | None | _Undefined
         case 3:
             return UNDEFINED
         case _:
-            return data[1:-1].decode()
+            return data[1 : data[::-1].index(0)].decode()
 
 
 checks: tuple[tuple[str, tuple[str, ...]], ...]
@@ -602,11 +603,6 @@ checks = (
             "jumpunless r3005, a",
             'add r, "3005"',
             "jumptarget r3005",
-            "jumptarget detectforpad",
-            'add r, "0123"',
-            'index_store cond, r, "length"',
-            "lt cond, 20",
-            "jumpif detectforpad, cond",
             "set submit_detections, r",
             "syscall _, 0, &submit_detections",
         ),
@@ -616,9 +612,8 @@ checks = (
         (
             'set &win, &["window"]',
             'index_store &date, &win, "Date"',
-            "new &fontlist, &date",
-            "plus &fontlist",
-            "set starttime, &fontlist",
+            "new &starttime, &date",
+            "plus &starttime",
             'index_store &json_parse, &win, "JSON"',
             'index &json_parse, "parse"',
             'call &fontlist, &json_parse, \'["Aldhabi","American Typewriter Semibold","Amiri","Arimo","Bahnschrift","Bai Jamjuree","Cambria Math","Chakra Petch","Charmonman","Chilanka","Cousine","Dancing Script","DejaVu Sans","Droid Sans Mono","Futura Bold","Gadugi","Galvji","Geneva","Gentium Book Basic","Helvetica Neue","HoloLens MDL2 Assets","InaiMathi Bold","Ink Free","Javanese Text","Jomolhari","KACSTOffice","Kodchasan","Kohinoor Devanagari Medium","Leelawadee UI","Liberation Mono","Lucida Console","Luminari","MONO","MS Outlook","MuktaMahee Regular","Myanmar Text","Nirmala UI","Noto Color Emoji","OpenSymbol","PingFang HK Light","Roboto","Segoe Fluent Icons","Segoe MDL2 Assets","Segoe UI Emoji","SignPainter-HouseScript Semibold","Source Code Pro","Ubuntu","ZWAdobeF"]\'',
@@ -659,12 +654,11 @@ checks = (
             "set cond, i",
             "lt cond, length",
             "jumpif fontsfor1, cond",
-            "new &fontlist, &date",
-            "plus &fontlist",
-            "set endtime, &fontlist",
-            "add starttime, 1000",
-            "gt endtime, starttime",
-            "jumpunless fontsend, endtime",
+            "new &endtime, &date",
+            "plus &endtime",
+            "add &starttime, 1000",
+            "gt &endtime, &starttime",
+            "jumpunless fontsend, &endtime",
             'index_store &queuetask, &win, "queueMicrotask"',
             'index_store &functionconstructor, &win, "Function"',
             'index &functionconstructor, "constructor"',
