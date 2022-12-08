@@ -44,7 +44,9 @@ def generate_response(
     trustzone, trustzone_keys = generate_trustzone()
 
     iv = os.urandom(8)
-    rnd = random.Random(iv + request.app.config.BACKEND_ENCRYPTION_SECRET)
+    rnd = random.Random(
+        iv + bytes.fromhex(request.app.config.BACKEND_ENCRYPTION_SECRET)
+    )
     trustzone_bytes = b"".join(
         id.to_bytes(1, "big") + ekey.to_bytes(4, "big") for id, ekey in trustzone_keys
     )
@@ -161,7 +163,8 @@ async def verify_request(
         return generate_response(request, requirement.unique, 0, captchas)
 
     rnd = random.Random(
-        encrypted_trustzone_keys[:8] + request.app.config.BACKEND_ENCRYPTION_SECRET
+        encrypted_trustzone_keys[:8]
+        + bytes.fromhex(request.app.config.BACKEND_ENCRYPTION_SECRET)
     )
     pad = rnd.randbytes(len(encrypted_trustzone_keys) - 8)
     decrypted_trustzone_keys = bytes(
