@@ -361,7 +361,7 @@ def decrypt(value: str | int, ekey: int) -> str | int | bool | None | _Undefined
     key = ekey.to_bytes(4, "big")
     data = bytes([x ^ key[i % 4] for i, x in enumerate(base64.b64decode(value))])
     print(data)
-    match data:
+    match data[0]:
         case 0:
             return True
         case 1:
@@ -385,7 +385,7 @@ def generate() -> tuple[CompiledCode, tuple[tuple[int, int], ...]]:
         code = checks[index][1]
         for line in code:
             tc.feed(line)
-    
+
     tc.feed("stop")
 
     compiled_code, memory_keys = tc.generate()
@@ -528,10 +528,10 @@ checks = (
             'syscall _, 6, &style, "width", "0px"',
             'syscall _, 6, &iframe, "srcdoc", "blank page"',
             'index_store &appendchild, &body, "appendChild"',
-            "syscall _, 1, &appendchild, &body, &iframe",
+            "syscall &_, 1, &appendchild, &body, &iframe",
             'index_store &a, &iframe, "contentWindow"',
             "call &allkeys, &keys, &a",
-            "syscall _, 1, &removechild, &body, &iframe",
+            "syscall &_, 1, &removechild, &body, &iframe",
             'index_store length, &allkeys, "length"',
             "set i, 0",
             "jumptarget detectfor1",
@@ -636,7 +636,7 @@ checks = (
             "new &fontface_instance, &fontface, fontname, fontpath",
             'index_store &fontface_load, &fontface_instance, "load"',
             "syscall &fontface_promise, 1, &fontface_load, &fontface_instance",
-            "syscall _, 1, &array_push, &promises, &fontface_promise",
+            "syscall &_, 1, &array_push, &promises, &fontface_promise",
             "add i, 1",
             "set cond, i",
             "lt cond, length",
