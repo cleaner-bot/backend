@@ -66,7 +66,7 @@ def generate_response(
             + request_fp
             + encrypted_trustzone_keys
         ),
-        "shsa256",
+        "sha256",
     ).digest()
 
     captcha_provider = captchas[captcha_index]
@@ -156,7 +156,7 @@ async def verify_request(
             + request_fp
             + encrypted_trustzone_keys
         ),
-        "shsa256",
+        "sha256",
     ).digest()
 
     if not hmac.compare_digest(signature, expected_signature):
