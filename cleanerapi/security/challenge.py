@@ -104,7 +104,7 @@ class ChallengeRequest(BaseModel):
 
 def checksum(value: int | str) -> int:
     if isinstance(value, int):
-        return crc32(value.to_bytes(4, "big", signed=False))
+        return crc32(value.to_bytes(4, "big", signed=True))
     return crc32(value.encode())
 
 
