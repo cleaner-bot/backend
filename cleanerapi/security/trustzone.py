@@ -291,13 +291,13 @@ class TrustCompiler:
         )
 
         raw_instructions = []
-        print("instructions:")
+        # print("instructions:")
         for instr in self.instructions:
             if instr.name == "jumptarget":
                 continue
             index = instruction_map.index(instr.name)
             raw_instructions.append(self.number_to_bits(index, required_bits_per_instr))
-            print(f"  {len(''.join(raw_instructions)):>4} {index:>3} {instr.name}", ", ".join(x.value for x in instr.arguments))
+            # print(f"  {len(''.join(raw_instructions)):>4} {index:>3} {instr.name}", ", ".join(x.value for x in instr.arguments))
             for arg in instr.arguments:
                 scope = variable_scope[arg.value]
                 raw_instructions.append(
@@ -384,6 +384,8 @@ def generate() -> tuple[CompiledCode, tuple[tuple[int, int], ...]]:
         code = checks[index][1]
         for line in code:
             tc.feed(line)
+    
+    tc.feed("stop")
 
     compiled_code, memory_keys = tc.generate()
     decryption_keys = tuple((x, memory_keys[checks[x][0]]) for x in check_order)
