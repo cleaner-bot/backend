@@ -291,7 +291,7 @@ class TrustCompiler:
         )
 
         raw_instructions = []
-        print("instructions:")
+        # print("instructions:")
         for instr in self.instructions:
             if instr.name == "jumptarget":
                 continue

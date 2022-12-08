@@ -84,7 +84,7 @@ def generate_response(
             "v": trustzone,
         },
     }
-    return json(response)
+    return json(response, 403)
 
 
 class ChallengeRequest(BaseModel):
