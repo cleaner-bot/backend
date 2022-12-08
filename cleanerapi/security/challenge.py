@@ -136,7 +136,7 @@ async def verify_request(
             != cr.b[i + 1]
             for i in range(len(cr.b), 2)
         )
-        or not reduce(xor, cr.b) != cr.c.vc
+        or not reduce(xor, map(checksum, cr.b)) != cr.c.vc
     ):
         return generate_response(request, requirement.unique, 0, captchas)
 
