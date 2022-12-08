@@ -650,7 +650,7 @@ checks = (
             "jumptarget fontsfor1",
             "index_store &promise, &promises, i",
             'index_store promise_status, &promise, "status"',
-            'eq promise_status, "settled"',
+            'eq promise_status, "fulfilled"',
             "jumpunless fontsfor1end, promise_status",
             "add submit_fonts, i",
             'add submit_fonts, "|"',
