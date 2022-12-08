@@ -297,7 +297,10 @@ class TrustCompiler:
                 continue
             index = instruction_map.index(instr.name)
             raw_instructions.append(self.number_to_bits(index, required_bits_per_instr))
-            print(f"  {len(''.join(raw_instructions)):>4} {index:>3} {instr.name}", ", ".join(x.value for x in instr.arguments))
+            print(
+                f"  {len(''.join(raw_instructions)):>4} {index:>3} {instr.name}",
+                ", ".join(x.value for x in instr.arguments),
+            )
             for arg in instr.arguments:
                 scope = variable_scope[arg.value]
                 raw_instructions.append(
@@ -400,10 +403,10 @@ checks = (
         (
             'set &a, &["window"]',
             'index &a, "Math"',
-            'index_store b, &a, "SQRT2"',
-            "mul b, 502",
+            'index_store &b, &a, "SQRT2"',
+            "mul &b, 502",
             'index &a, "sinh"',
-            "call &a, &a, b",
+            "call &a, &a, &b",
             'index_store &b, &a, "toString"',
             "syscall submit_math_sinh, 1, &b, &a",
             "syscall _, 0, &submit_math_sinh",
@@ -576,8 +579,8 @@ checks = (
             "jumpunless r2000, a",
             'add r, "2000"',
             "jumptarget r2000",
-            'index_store a, &nav, "getBattery"',
-            "jumpunless r3000, a",
+            'index_store &a, &nav, "getBattery"',
+            "jumpunless r3000, &a",
             'add r, "3000"',
             "jumptarget r3000",
             'index_store a, &nav, "deviceMemory"',
@@ -588,12 +591,12 @@ checks = (
             "jumpunless r3002, a",
             'add r, "3002"',
             "jumptarget r3002",
-            'index_store a, &nav, "mozGetUserMedia"',
-            "jumpunless r3003, a",
+            'index_store &a, &nav, "mozGetUserMedia"',
+            "jumpunless r3003, &a",
             'add r, "3003"',
             "jumptarget r3003",
-            'index_store a, &nav, "getStorageUpdates"',
-            "jumpunless r3004, a",
+            'index_store &a, &nav, "getStorageUpdates"',
+            "jumpunless r3004, &a",
             'add r, "3004"',
             "jumptarget r3004",
             'index_store a, &nav, "buildID"',
