@@ -77,7 +77,7 @@ class TurnstileProvider(CaptchaProvider):
 class ButtonProvider(CaptchaProvider):
     @classmethod
     def _signature_to_nonce(cls, signature: bytes) -> int:
-        return int.from_bytes(signature[:6], "big")
+        return int.from_bytes(signature[:6], "big", signed=True)
 
     @classmethod
     async def verify(cls, request: Request, *, token: str, signature: bytes) -> bool:
@@ -90,9 +90,9 @@ class ButtonProvider(CaptchaProvider):
         nonce = cls._signature_to_nonce(signature)
         secret = crc32(secret_bytes)
         secret ^= nonce & 0xFFFFFFFF
-        trust = decoded[8] ^ (secret >> 16) & 0xFF
-        if trust & 0x0F:
-            print("button - click not trusted", trust)
+        untrusted = decoded[8] ^ (secret >> 16) & 0xf
+        if untrusted:
+            print("button - click not trusted", bin(untrusted))
             return False
         values = []
         for i in range(9, len(decoded), 2):
