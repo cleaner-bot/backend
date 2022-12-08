@@ -108,7 +108,7 @@ class Variable(typing.NamedTuple):
             key = ekey.to_bytes(4, "big")
             data = bytearray(self.value.encode())
             data.append(0)
-            data.extend((x for x in random.randbytes(random.randrange(5, 30)) if x))
+            data.extend((x for x in random.randbytes(random.randrange(5, 30)) if x > 0))
             return (
                 base64.b64encode(bytes(x ^ key[i % 4] for i, x in enumerate(data)))
                 .decode()
@@ -226,7 +226,7 @@ class TrustCompiler:
                 Variable(
                     False,
                     False,
-                    repr("__" + random.randbytes(random.randrange(3, 20)).hex())
+                    random.randbytes(random.randrange(3, 20)).hex()
                     if random.random() > 0.9
                     else str(random.randint(0, 1 << 32)),
                 )
@@ -235,7 +235,7 @@ class TrustCompiler:
                 Variable(
                     False,
                     False,
-                    repr("__" + random.randbytes(random.randrange(3, 20)).hex())
+                    random.randbytes(random.randrange(3, 20)).hex()
                     if random.random() > 0.9
                     else str(random.randint(0, 1 << 32)),
                 )
