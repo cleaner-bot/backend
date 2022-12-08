@@ -90,7 +90,7 @@ class ButtonProvider(CaptchaProvider):
         nonce = cls._signature_to_nonce(signature)
         secret = crc32(secret_bytes)
         secret ^= nonce & 0xFFFFFFFF
-        untrusted = decoded[8] ^ (secret >> 16) & 0xf
+        untrusted = (decoded[8] ^ (secret >> 16)) & 0xf
         if untrusted:
             print("button - click not trusted", bin(untrusted))
             return False
