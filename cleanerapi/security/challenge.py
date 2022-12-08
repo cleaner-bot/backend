@@ -136,7 +136,7 @@ async def verify_request(
             != cr.b[i + 1]
             for i in range(len(cr.b), 2)
         )
-        or not reduce(xor, map(checksum, cr.b)) != cr.c.vc & 0xFFFFFFFF
+        or reduce(xor, map(checksum, cr.b)) != cr.c.vc & 0xFFFFFFFF
     ):
         print(
             "failed checksum check",
