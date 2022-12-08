@@ -104,7 +104,7 @@ class ChallengeRequest(BaseModel):
 
 def checksum(value: int | str) -> int:
     if isinstance(value, int):
-        return crc32((value  & 0xffffffff).to_bytes(4, "big"))
+        return crc32((value & 0xFFFFFFFF).to_bytes(4, "big"))
     return crc32(value.encode())
 
 
@@ -136,13 +136,32 @@ async def verify_request(
             != cr.b[i + 1]
             for i in range(len(cr.b), 2)
         )
-        or not reduce(xor, map(checksum, cr.b)) != cr.c.vc & 0xffffffff
+        or not reduce(xor, map(checksum, cr.b)) != cr.c.vc & 0xFFFFFFFF
     ):
+        print(
+            "failed checksum check",
+            all(isinstance(x, int) for x in cr.b[1::2]),
+            all(
+                checksum(cr.b[i])
+                ^ 0x735A20DC
+                ^ crc32(bytes([i, 0x0C, 0x88, 0x59, 0xDD]))
+                != cr.b[i + 1]
+                for i in range(len(cr.b), 2)
+            ),
+            reduce(xor, map(checksum, cr.b)),
+            cr.c.vc & 0xFFFFFFFF,
+        )
         return generate_response(request, requirement.unique, 0, captchas)
 
     signature = b64parse(cr.c.h)
     encrypted_trustzone_keys = b64parse(cr.c.vk)
-    if signature is None or encrypted_trustzone_keys is None or cr.c.p not in providers:
+    if (
+        signature is None
+        or len(signature) != 32
+        or encrypted_trustzone_keys is None
+        or cr.c.p not in providers
+    ):
+        print("invalid signature", signature, encrypted_trustzone_keys, cr.c.p)
         return generate_response(request, requirement.unique, 0, captchas)
 
     request_fp = fingerprint_request(request, "chl")
@@ -160,6 +179,7 @@ async def verify_request(
     ).digest()
 
     if not hmac.compare_digest(signature, expected_signature):
+        print("signature does not match", signature, expected_signature)
         return generate_response(request, requirement.unique, 0, captchas)
 
     rnd = random.Random(
@@ -179,6 +199,7 @@ async def verify_request(
     ]
 
     if 2 * len(trustzone_keys) > len(cr.b):
+        print("too many trustzone keys")
         return generate_response(request, requirement.unique, 0, captchas)
 
     print("keys", trustzone_keys)
