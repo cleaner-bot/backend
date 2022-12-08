@@ -87,12 +87,6 @@ def generate_response(
     return json(response, 403)
 
 
-class ChallengeRequest(BaseModel):
-    c: ChallengeRequestCaptchaData
-    b: list[int | str]
-    p: typing.Any
-
-
 class ChallengeRequestCaptchaData(BaseModel):
     h: typing.Annotated[str, constr(min_length=44, max_length=44)]
     i: typing.Annotated[int, conint(ge=0, lt=65535)]
@@ -100,6 +94,12 @@ class ChallengeRequestCaptchaData(BaseModel):
     t: int
     vk: str
     vc: int
+
+
+class ChallengeRequest(BaseModel):
+    c: ChallengeRequestCaptchaData
+    b: list[int | str]
+    p: typing.Any
 
 
 def checksum(value: int | str) -> int:
