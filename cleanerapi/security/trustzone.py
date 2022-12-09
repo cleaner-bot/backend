@@ -574,7 +574,7 @@ checks = (
             'add r, ","',
             "jumptarget r1A02",
             'index_store a, &nav, "webdriver"',
-            "sne a, fale",
+            "sne a, false",
             "jumpunless r1A03, a",
             "add r, 0x1A03",
             'add r, ","',
