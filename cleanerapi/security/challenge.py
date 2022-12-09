@@ -203,10 +203,15 @@ async def verify_request(
         return generate_response(request, requirement.unique, 0, captchas)
 
     print("keys", trustzone_keys)
-    values = {
-        trustzone_checks[no][0]: decrypt_trustzone_result(cr.b[2 * i], ekey)
-        for i, (no, ekey) in enumerate(trustzone_keys)
-    }
+    try:
+        values = {
+            trustzone_checks[no][0]: decrypt_trustzone_result(cr.b[2 * i], ekey)
+            for i, (no, ekey) in enumerate(trustzone_keys)
+        }
+    except UnicodeDecodeError:
+        print("failed to decode part of challenge solution")
+        return generate_response(request, requirement.unique, captcha_index, captchas)
+
     print(values)
 
     if cr.c.p != captchas[captcha_index]:
