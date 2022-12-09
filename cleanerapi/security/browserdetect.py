@@ -402,6 +402,7 @@ def check_detections(browserdata: BrowserData, browser: Browser) -> BrowserCheck
                 #   05 toString proxy (only firefox)
                 # 1Exx plugins
                 #   00 nopecha (recaptcha auto open trap)
+                #   01 nopecha (aws auto open trap)
                 # 1Fxx generic
                 #   00 something in window ending with `_Symbol`
                 #   01 something in iframe window ending with `_Symbol`
