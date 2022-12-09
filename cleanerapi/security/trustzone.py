@@ -363,7 +363,6 @@ def decrypt(value: str | int, ekey: int) -> str | int | bool | None | _Undefined
         return value ^ ekey
     key = ekey.to_bytes(4, "big")
     data = bytes([x ^ key[i % 4] for i, x in enumerate(base64.b64decode(value))])
-    print(data)
     match data[0]:
         case 0:
             return True
