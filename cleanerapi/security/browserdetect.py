@@ -82,7 +82,7 @@ def browser_check(
     # check if payload makes sense
     browserdata_shape = {k: type(v) for k, v in browserdata.items()}
     # using a string compare cuz everything else just does not work
-    if str(browserdata_shape) != str(BrowserData.__annotations__):
+    if browserdata_shape != BrowserData.__annotations__:
         print("shape of browserdata does not match", browserdata_shape, browserdata)
         return BrowserCheckResult.BAD_REQUEST, b"", 0
 
