@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import enum
 import time
 import typing
@@ -62,13 +60,27 @@ LINUX_FONTS = {
 }
 
 
+class BrowserData(typing.TypedDict):
+    picasso: str
+    detections: str
+    localestring: str
+    math_pow: str
+    math_sinh: str
+    time: str
+    engine: str
+    fonts: str
+    navigator_webdriver: bool
+    navigator_language: str
+    navigator_platform: str
+    document_location: str
+    token: str
+
+
 def browser_check(
     request: Request, browserdata: BrowserData
 ) -> tuple[BrowserCheckResult, bytes, int]:
     # check if payload makes sense
-    browserdata_shape = {
-        k: typing.ForwardRef(type(v).__name__) for k, v in browserdata.items()
-    }
+    browserdata_shape = {k: type(v) for k, v in browserdata.items()}
     # using a string compare cuz everything else just does not work
     if str(browserdata_shape) != str(BrowserData.__annotations__):
         print("shape of browserdata does not match", browserdata_shape, browserdata)
@@ -452,19 +464,3 @@ def check_picasso(browserdata: BrowserData) -> tuple[BrowserCheckResult, int]:
         return BrowserCheckResult.TAMPERED, 0
 
     return BrowserCheckResult.OK, fp
-
-
-class BrowserData(typing.TypedDict):
-    picasso: str
-    detections: str
-    localestring: str
-    math_pow: str
-    math_sinh: str
-    time: str
-    engine: str
-    fonts: str
-    navigator_webdriver: bool
-    navigator_language: str
-    navigator_platform: str
-    document_location: str
-    token: str
