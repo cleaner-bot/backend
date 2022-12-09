@@ -377,10 +377,6 @@ def check_detections(browserdata: BrowserData, browser: Browser) -> BrowserCheck
         print("detections contains non-int", browserdata["detections"])
         return BrowserCheckResult.TAMPERED
 
-    if len(all_detections) < 10:
-        print("not enough detections", all_detections)
-        return BrowserCheckResult.TAMPERED
-
     browsers = {Browser.CHROMIUM, Browser.WEBKIT, Browser.FIREFOX}
     detections = []
     results: list[BrowserCheckResult] = []
