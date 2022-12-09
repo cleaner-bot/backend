@@ -79,8 +79,10 @@ class Variable(typing.NamedTuple):
     value: str
 
     def is_number(self) -> bool:
-        return self.value.isdigit() or (
-            self.value.startswith("-") and self.value[1:].isdigit()
+        return (
+            self.value.isdigit()
+            or (self.value.startswith("-") and self.value[1:].isdigit())
+            or self.value.startswith("0x")
         )
 
     def is_string(self) -> bool:
@@ -94,7 +96,7 @@ class Variable(typing.NamedTuple):
 
     def encrypt(self, ekey: int) -> str | int:
         if self.is_number():
-            return int(self.value) ^ ekey
+            return int(self.value, 16 if self.value.startswith("0x") else 10) ^ ekey
         elif self.is_bool():
             key = ekey.to_bytes(4, "big")
             data = [BOOLEAN_VALUES.index(self.value.lower())]
@@ -226,7 +228,7 @@ class TrustCompiler:
                 Variable(
                     False,
                     False,
-                    random.randbytes(random.randrange(3, 20)).hex()
+                    repr("__" + random.randbytes(random.randrange(3, 20)).hex())
                     if random.random() > 0.9
                     else str(random.randint(0, 1 << 32)),
                 )
@@ -235,7 +237,7 @@ class TrustCompiler:
                 Variable(
                     False,
                     False,
-                    random.randbytes(random.randrange(3, 20)).hex()
+                    repr("__" + random.randbytes(random.randrange(3, 20)).hex())
                     if random.random() > 0.9
                     else str(random.randint(0, 1 << 32)),
                 )
@@ -502,7 +504,8 @@ checks = (
             'set r, ""',
             'syscall a, 1, &has, &win, "objectToInspect"',
             "jumpunless r1000, a",
-            'add r, "1000"',
+            "add r, 0x1000",
+            'add r, ","',
             "jumptarget r1000",
             'index_store &keys, &win, "Object"',
             'index &keys, "keys"',
@@ -516,7 +519,8 @@ checks = (
             "index_store name, &allkeys, i",
             'syscall cond, 1, &endswith, name, "_Symbol"',
             "jumpunless detectfor0continue, cond",
-            'add r, "1200"',
+            "add r, 0x1200",
+            'add r, ","',
             "jump detectfor0done",
             "jumptarget detectfor0continue",
             "add i, 1",
@@ -544,64 +548,77 @@ checks = (
             "index_store name, &allkeys, i",
             'syscall cond, 1, &endswith, name, "_Symbol"',
             "jumpunless detectfor1continue, cond",
-            'add r, "1201"',
+            "add r, 0x1201",
+            'add r, ","',
             "jump detectfor1done",
             "jumptarget detectfor1continue",
             "add i, 1",
             "jumptarget detectfor1done",
             "syscall a, 5",
             "jumpunless r1A00, a",
-            'add r, "1A00"',
+            "add r, 0x1A00",
+            'add r, ","',
             "jumptarget r1A00",
             'syscall &a, 1, &getter, &nav, "userAgent"',
             "plus &a",
             'syscall a, 1, &includes, &a, "[native code]"',
             "jumpunless r1A01, a",
-            'add r, "1A01"',
+            "add r, 0x1A01",
+            'add r, ","',
             "jumptarget r1A01",
             'syscall &a, 1, &getter, &nav, "webdriver"',
             "plus &a",
             'syscall a, 1, &includes, &a, "[native code]"',
             "jumpunless r1A02, a",
-            'add r, "1A02"',
+            "add r, 0x1A02",
+            'add r, ","',
             "jumptarget r1A02",
             'index_store a, &nav, "webdriver"',
             "sne a, fale",
             "jumpunless r1A03, a",
-            'add r, "1A03"',
+            "add r, 0x1A03",
+            'add r, ","',
             "jumptarget r1A03",
             'syscall a, 1, &has, &win, "recaptchaLoadCallback"',
             "jumpunless r1E00, a",
-            'add r, "1E00"',
+            "add r, 0x1E00",
+            'add r, ","',
             "jumptarget r1E00",
             'index_store a, &nav, "pdfViewerEnabled"',
             "seq a, false",
             "jumpunless r2000, a",
-            'add r, "2000"',
+            "add r, 0x2000",
+            'add r, ","',
             "jumptarget r2000",
             'index_store &a, &nav, "getBattery"',
             "jumpunless r3000, &a",
-            'add r, "3000"',
+            "add r, 0x3000",
+            'add r, ","',
             "jumptarget r3000",
             'index_store a, &nav, "deviceMemory"',
             "jumpunless r3001, a",
-            'add r, "3001"',
+            "add r, 0x3001",
+            'add r, ","',
             "jumptarget r3001",
             'index_store a, &nav, "taintEnabled"',
             "jumpunless r3002, a",
-            'add r, "3002"',
+            "add r, 0x3002",
+            'add r, ","',
             "jumptarget r3002",
             'index_store &a, &nav, "mozGetUserMedia"',
             "jumpunless r3003, &a",
-            'add r, "3003"',
+            "add r, 0x3003",
+            'add r, ","',
             "jumptarget r3003",
             'index_store &a, &nav, "getStorageUpdates"',
             "jumpunless r3004, &a",
-            'add r, "3004"',
+            "add r, 0x3004",
+            'add r, ","',
             "jumptarget r3004",
             'index_store a, &nav, "buildID"',
             "jumpunless r3005, a",
-            'add r, "3005"',
+            "add r, 0x3005",
+            'add r, ","',
             "jumptarget r3005",
             "set submit_detections, r",
             "syscall _, 0, &submit_detections",
@@ -647,7 +664,8 @@ checks = (
             'index_store promise_status, &promise, "status"',
             'eq promise_status, "fulfilled"',
             "jumpunless fontsfor1end, promise_status",
-            "add submit_fonts, i",
+            "index_store fontname, &fontlist, i",
+            "add submit_fonts, fontname",
             'add submit_fonts, "|"',
             "jumptarget fontsfor1end",
             "add i, 1",

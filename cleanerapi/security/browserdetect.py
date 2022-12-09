@@ -297,7 +297,7 @@ def check_locale_spoof(
 def check_fonts(
     browserdata: BrowserData, platform: Platform
 ) -> tuple[BrowserCheckResult, set[str]]:
-    fonts = set(browserdata["fonts"])
+    fonts = set(browserdata["fonts"].split("|")[:-1])
     if fonts & APPLE_FONTS:
         if platform not in {Platform.MAC, Platform.IOS}:
             print("apple fonts, but not apple platform", platform)
@@ -372,7 +372,7 @@ def check_browser_engine(
 
 def check_detections(browserdata: BrowserData, browser: Browser) -> BrowserCheckResult:
     try:
-        all_detections = list(map(int, browserdata["detections"].split(",")))
+        all_detections = list(map(int, browserdata["detections"].split(",")[:-1]))
     except ValueError:
         print("detections contains non-int", browserdata["detections"])
         return BrowserCheckResult.TAMPERED
