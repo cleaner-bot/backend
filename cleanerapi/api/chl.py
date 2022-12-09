@@ -51,29 +51,6 @@ async def post_human_challenge(
         return text("Missing 'p' in body", 400)
     elif "t" not in payload:
         return text("Missing 't' in body.p", 400)
-    # elif browserdata is None:
-    #     return text("Missing 'd' in body", 400)
-
-    # browser_result, browser_fingerprint, picasso_fingerprint = browser_check(
-    #     request, typing.cast(BrowserData, browserdata)
-    # )
-    # print("browser check", browser_result, browser_fingerprint)
-    # if browser_result == BrowserCheckResult.BAD_REQUEST:
-    #     return text("Bad request", 400)
-
-    # picasso_matching = await database.incr(f"cache:picasso:{picasso_fingerprint}")
-    # if picasso_matching == 1:
-    #     await database.expire(f"cache:picasso:{picasso_fingerprint}", 300)
-
-    # if (
-    #     await database.exists((f"cache:ip:{request.ip}:banned",))
-    #     or picasso_matching > 30
-    # ):
-    #     return text("Ratelimit reached", 429)
-
-    # if browser_result == BrowserCheckResult.AUTOMATED:
-    #     await database.set(f"cache:ip:{request.ip}:banned", "1", ex=60)
-    #     return text("Automation software detected", 403)
 
     result: HTTPResponse | CaptchaRequirement
     if payload["t"] == "j":  # joinguard

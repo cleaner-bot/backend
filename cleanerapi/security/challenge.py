@@ -11,10 +11,12 @@ from enum import Enum, auto
 from functools import reduce
 from operator import xor
 
+from coredis import Redis
 from pydantic import BaseModel, ValidationError, conint, constr
 from sanic import HTTPResponse, Request, json, text
 
 from ..helpers.based import b64parse
+from .browserdetect import BrowserCheckResult, BrowserData, browser_check
 from .captcha_providers import providers
 from .fingerprint import fingerprint as fingerprint_request
 from .proxy import is_request_from_proxy
@@ -111,17 +113,8 @@ def checksum(value: int | str) -> int:
 async def verify_request(
     request: Request, requirement: CaptchaRequirement
 ) -> HTTPResponse | None:
+    database = typing.cast(Redis[bytes], request.app.ctx.database)
     captchas = ["button", "turnstile"]
-
-    if await is_request_from_proxy(request):
-        if requirement.level == SecurityLevel.RAID:
-            return text("Temporarily unavailable.", 403)
-        captchas.append("hcaptcha")
-
-    if requirement.level == SecurityLevel.CAPTCHA:
-        captchas.append("hcaptcha")
-    elif requirement.level == SecurityLevel.RAID:
-        captchas.extend(("pow", "hcaptcha"))
 
     try:
         cr = ChallengeRequest.parse_obj(request.json)
@@ -181,6 +174,9 @@ async def verify_request(
     if not hmac.compare_digest(signature, expected_signature):
         print("signature does not match", signature, expected_signature)
         return generate_response(request, requirement.unique, 0, captchas)
+    elif time.time() > cr.c.t + 300:
+        print("challenge timed out", int(time.time()), cr.c.t)
+        return generate_response(request, requirement.unique, 0, captchas)
 
     rnd = random.Random(
         encrypted_trustzone_keys[:8]
@@ -198,21 +194,64 @@ async def verify_request(
         for i in range(0, len(decrypted_trustzone_keys), 5)
     ]
 
-    if 2 * len(trustzone_keys) > len(cr.b):
-        print("too many trustzone keys")
-        return generate_response(request, requirement.unique, 0, captchas)
+    if 2 * len(trustzone_keys) != len(cr.b):
+        print(
+            "not matching amount of trustzone keys", 2 * len(trustzone_keys), len(cr.b)
+        )
+        return generate_response(request, requirement.unique, captcha_index, captchas)
 
-    print("keys", trustzone_keys)
     try:
-        values = {
-            trustzone_checks[no][0]: decrypt_trustzone_result(cr.b[2 * i], ekey)
-            for i, (no, ekey) in enumerate(trustzone_keys)
-        }
+        values = typing.cast(
+            BrowserData,
+            {
+                trustzone_checks[no][0]: decrypt_trustzone_result(cr.b[2 * i], ekey)
+                for i, (no, ekey) in enumerate(trustzone_keys)
+            },
+        )
     except UnicodeDecodeError:
         print("failed to decode part of challenge solution")
         return generate_response(request, requirement.unique, captcha_index, captchas)
 
+    if requirement.level == SecurityLevel.CAPTCHA:
+        captchas.append("hcaptcha")
+    elif requirement.level == SecurityLevel.RAID:
+        captchas.extend(("pow", "hcaptcha"))
+
     print(values)
+    result, fp, picasso = browser_check(request, values)
+
+    print("browser check", fp, picasso)
+
+    picasso_matching = await database.incr(f"cache:picasso:{picasso}")
+    if picasso_matching == 1:
+        await database.expire(f"cache:picasso:{picasso}", 300)
+
+    if (
+        await database.exists((f"cache:ip:{request.ip}:banned",))
+        or picasso_matching > 30
+    ):
+        return text("Ratelimit reached", 429)
+
+    match result:
+        case BrowserCheckResult.AUTOMATED:
+            await database.set(f"cache:ip:{request.ip}:banned", "1", ex=60)
+            return text("Automation software detected", 403)
+        case BrowserCheckResult.BAD_REQUEST:
+            return text("Bad request", 400)
+        case BrowserCheckResult.SUSPICIOUS:
+            captchas.extend(("pow", "hcaptcha"))
+        case BrowserCheckResult.TAMPERED:
+            captchas.extend(
+                ("pow", "hcaptcha", "turnstile", "button", "pow", "hcaptcha")
+            )
+
+    if result != BrowserCheckResult.OK and requirement.level == SecurityLevel.RAID:
+        return text("Temporarily unavailable.", 403)
+
+    if await is_request_from_proxy(request):
+        if requirement.level == SecurityLevel.RAID:
+            return text("Temporarily unavailable.", 403)
+        captchas.append("hcaptcha")
 
     if cr.c.p != captchas[captcha_index]:
         return generate_response(request, requirement.unique, captcha_index, captchas)

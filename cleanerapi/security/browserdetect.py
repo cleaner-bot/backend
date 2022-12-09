@@ -1,13 +1,11 @@
 from __future__ import annotations
 
 import enum
+import time
 import typing
 from binascii import crc32
-from datetime import datetime
 
 from sanic import Request
-
-from ..helpers.based import b64parse
 
 
 class BrowserCheckResult(enum.Enum):
@@ -76,38 +74,21 @@ def browser_check(
         print("shape of browserdata does not match", browserdata_shape, browserdata)
         return BrowserCheckResult.BAD_REQUEST, b"", 0
 
-    time_valid = check_time(browserdata)
-    sequence_valid = check_sequence(browserdata)
-    if (
-        time_valid == BrowserCheckResult.TAMPERED
-        or sequence_valid == BrowserCheckResult.TAMPERED
-    ):
-        return BrowserCheckResult.BAD_REQUEST, b"", 0
-
-    base_seed = bytearray((browserdata["t2"] & 0xFFFF_FFFF).to_bytes(4, "big"))
-    base_seed[0] ^= browserdata["s"] >> 8
-    base_seed[1] ^= browserdata["s"] & 0xFF
-    base_seed[2] ^= browserdata["s"] >> 8
-    base_seed[3] ^= browserdata["s"] & 0xFF
-
-    math_result, browser = check_math(browserdata, base_seed)
+    time_result = check_time(browserdata)
+    math_result, browser = check_math(browserdata)
     browser_headers_result = check_browser_headers(request, browser)
-    platform_result, platform = check_platform(browserdata, base_seed)
+    platform_result, platform = check_platform(browserdata)
     platform_ch_result = check_platform_ch(request, browser, platform)
-    url_result, url = check_url(browserdata, base_seed)
-    locale_result, locale = check_locale(browserdata, base_seed, request)
-    locale_spoof_result, locale_spoof = check_locale_spoof(
-        browserdata, base_seed, browser
-    )
-    fonts_result, fonts = check_fonts(browserdata, base_seed, platform)
-    rtt_result = check_connection_rtt(browserdata, base_seed)
-    browser_engine_result = check_browser_engine(browserdata, base_seed, browser)
-    detections_result = check_detections(browserdata, base_seed, browser)
-    picasso_result, picasso_fingerprint = check_picasso(browserdata, base_seed)
+    url_result, url = check_url(browserdata)
+    locale_result, locale = check_locale(browserdata, request)
+    locale_spoof_result, locale_spoof = check_locale_spoof(browserdata, browser)
+    fonts_result, fonts = check_fonts(browserdata, platform)
+    browser_engine_result = check_browser_engine(browserdata, browser)
+    detections_result = check_detections(browserdata, browser)
+    picasso_result, picasso_fingerprint = check_picasso(browserdata)
 
     fingerprint = b"\x00".join(
         [
-            browserdata["t1"].to_bytes(8, "big"),
             browser.name.encode(),
             platform.name.encode(),
             url,
@@ -117,7 +98,9 @@ def browser_check(
             *map(str.encode, fonts),
         ]
     )
+
     results = [
+        time_result,
         math_result,
         browser_headers_result,
         platform_result,
@@ -126,7 +109,6 @@ def browser_check(
         locale_result,
         locale_spoof_result,
         fonts_result,
-        rtt_result,
         browser_engine_result,
         detections_result,
         picasso_result,
@@ -136,22 +118,11 @@ def browser_check(
 
 
 def check_time(browserdata: BrowserData) -> BrowserCheckResult:
-    # check if the values make sense
-    if browserdata["t1"] >= browserdata["t2"]:
-        print("current before page load", browserdata)
-        return BrowserCheckResult.TAMPERED
-    elif browserdata["t2"] > browserdata["t3"]:
-        print("submit before current", browserdata)
-        return BrowserCheckResult.TAMPERED
+    if not browserdata["time"].isdigit():
+        print("time is not an integer", browserdata["time"])
+        return BrowserCheckResult.BAD_REQUEST
 
-    expected_tc = (
-        browserdata["t1"] ^ browserdata["t2"] ^ browserdata["t3"] ^ browserdata["s"]
-    ) & 0xFFFF
-    if expected_tc != browserdata["tc"]:
-        print("incorrect tc", browserdata, expected_tc)
-        return BrowserCheckResult.TAMPERED
-
-    time_delta = abs(browserdata["t2"] - datetime.now().timestamp() * 1000)
+    time_delta = abs(int(browserdata["time"]) - time.time() * 1000)
     if time_delta > 60_000:
         print("time delta too large", time_delta, browserdata)
         return BrowserCheckResult.SUSPICIOUS
@@ -159,54 +130,22 @@ def check_time(browserdata: BrowserData) -> BrowserCheckResult:
     return BrowserCheckResult.OK
 
 
-def check_sequence(browserdata: BrowserData) -> BrowserCheckResult:
-    # check if sequence number makes sense
-    lower_bounds = (browserdata["t1"] + browserdata["t2"]) & 0xFFFF
-    upper_bounds = (browserdata["t1"] + browserdata["t2"] + 1000) & 0xFFFF
-    if lower_bounds > upper_bounds:  # its at the wrap around point
-        if upper_bounds < browserdata["s"] < lower_bounds:
-            print("sequence out of bounce (wrapped)", browserdata)
-            return BrowserCheckResult.TAMPERED
-    else:
-        if not upper_bounds >= browserdata["s"] >= lower_bounds:
-            print("sequence out of bounce (not wrapped)", browserdata)
-            return BrowserCheckResult.TAMPERED
-
-    return BrowserCheckResult.OK
-
-
-def check_math(
-    browserdata: BrowserData, base_seed: bytes
-) -> tuple[BrowserCheckResult, Browser]:
-    key_m1 = crc32(bytes([x ^ 181 for x in base_seed])).to_bytes(4, "big")
-    decoded_m1 = b64parse(browserdata["m1"])
-    if decoded_m1 is None:
-        print("m1 is not valid base64", browserdata)
-        return BrowserCheckResult.BAD_REQUEST, Browser.UNKNOWN
-    m1 = bytes([x ^ key_m1[i % 4] for i, x in enumerate(decoded_m1)])
-
-    key_m2 = crc32(bytes([x ^ 40 for x in base_seed])).to_bytes(4, "big")
-    decoded_m2 = b64parse(browserdata["m2"])
-    if decoded_m2 is None:
-        print("m2 is not valid base64", browserdata)
-        return BrowserCheckResult.BAD_REQUEST, Browser.UNKNOWN
-    m2 = bytes([x ^ key_m2[i % 4] for i, x in enumerate(decoded_m2)])
-
+def check_math(browserdata: BrowserData) -> tuple[BrowserCheckResult, Browser]:
     browsers = {Browser.WEBKIT, Browser.CHROMIUM, Browser.FIREFOX}
-    if m1 == b"1.9275814160560204e-50":
+    if browserdata["math_pow"] == "1.9275814160560204e-50":
         browsers &= {Browser.CHROMIUM}
-    elif m1 == b"1.9275814160560206e-50":
+    elif browserdata["math_pow"] == "1.9275814160560206e-50":
         browsers &= {Browser.WEBKIT, Browser.FIREFOX}
     else:
-        print("invalid m1 value", m1)
+        print("invalid m1 value", browserdata["math_pow"])
         return BrowserCheckResult.SUSPICIOUS, Browser.UNKNOWN
 
-    if m2 == b"1.046919966902314e+308":
+    if browserdata["math_sinh"] == "1.046919966902314e+308":
         browsers &= {Browser.FIREFOX}
-    elif m2 == b"1.0469199669023138e+308":
+    elif browserdata["math_sinh"] == "1.0469199669023138e+308":
         browsers &= {Browser.WEBKIT, Browser.CHROMIUM}
     else:
-        print("invalid m2 value", m2)
+        print("invalid m2 value", browserdata["math_sinh"])
         return BrowserCheckResult.SUSPICIOUS, Browser.UNKNOWN
 
     if len(browsers) != 1:
@@ -261,22 +200,8 @@ def check_browser_headers(request: Request, browser: Browser) -> BrowserCheckRes
     return BrowserCheckResult.OK
 
 
-def check_platform(
-    browserdata: BrowserData, base_seed: bytes
-) -> tuple[BrowserCheckResult, Platform]:
-    key = crc32(bytes([x ^ 149 for x in base_seed])).to_bytes(4, "big")
-    decoded = b64parse(browserdata["p1"])
-    if decoded is None:
-        print("p1 is not valid base64", browserdata)
-        return BrowserCheckResult.BAD_REQUEST, Platform.UNKNOWN
-    decrypted = bytes([x ^ key[i % 4] for i, x in enumerate(decoded)])
-    print("p1", decrypted)
-    try:
-        platform = decrypted.decode()
-    except UnicodeDecodeError:
-        print("invalid p1 value", decrypted)
-        return BrowserCheckResult.TAMPERED, Platform.UNKNOWN
-
+def check_platform(browserdata: BrowserData) -> tuple[BrowserCheckResult, Platform]:
+    platform = browserdata["navigator_platform"]
     if platform.startswith("iP"):
         return BrowserCheckResult.OK, Platform.IOS
     elif platform.startswith("Mac"):
@@ -323,41 +248,14 @@ def check_platform_ch(
     return BrowserCheckResult.OK
 
 
-def check_url(
-    browserdata: BrowserData, base_seed: bytes
-) -> tuple[BrowserCheckResult, bytes]:
-    key = crc32(bytes([x ^ 67 for x in base_seed])).to_bytes(4, "big")
-    decoded = b64parse(browserdata["l1"])
-    if decoded is None:
-        print("l1 is not valid base64", browserdata)
-        return BrowserCheckResult.BAD_REQUEST, b""
-    decrypted = bytes([x ^ key[i % 4] for i, x in enumerate(decoded)])
-    print("l1", decrypted)
-    try:
-        url = decrypted.decode()
-    except UnicodeDecodeError:
-        print("invalid l1 value", decrypted)
-        return BrowserCheckResult.TAMPERED, decrypted
-
-    return BrowserCheckResult.OK, url.encode()
+def check_url(browserdata: BrowserData) -> tuple[BrowserCheckResult, bytes]:
+    return BrowserCheckResult.OK, browserdata["document_location"].encode()
 
 
 def check_locale(
-    browserdata: BrowserData, base_seed: bytes, request: Request
+    browserdata: BrowserData, request: Request
 ) -> tuple[BrowserCheckResult, bytes]:
-    key = crc32(bytes([x ^ 114 for x in base_seed])).to_bytes(4, "big")
-    decoded = b64parse(browserdata["l2"])
-    if decoded is None:
-        print("l2 is not valid base64", browserdata)
-        return BrowserCheckResult.BAD_REQUEST, b""
-    decrypted = bytes([x ^ key[i % 4] for i, x in enumerate(decoded)])
-    print("l2", decrypted)
-    try:
-        locale = decrypted.decode()
-    except UnicodeDecodeError:
-        print("invalid l2 value", decrypted)
-        return BrowserCheckResult.TAMPERED, decrypted
-
+    locale = browserdata["navigator_language"]
     accept_language = request.headers.get("accept-language")
     if accept_language is None or locale not in accept_language:
         print("invalid locale", locale, accept_language)
@@ -367,70 +265,27 @@ def check_locale(
 
 
 def check_locale_spoof(
-    browserdata: BrowserData, base_seed: bytes, browser: Browser
+    browserdata: BrowserData, browser: Browser
 ) -> tuple[BrowserCheckResult, bytes]:
-    key = crc32(bytes([x ^ 184 for x in base_seed])).to_bytes(4, "big")
-    decoded = b64parse(browserdata["l3"])
-    if decoded is None:
-        print("l3 is not valid base64", browserdata)
-        return BrowserCheckResult.BAD_REQUEST, b""
-    decrypted = bytes([x ^ key[i % 4] for i, x in enumerate(decoded)])
-    print("l3", decrypted)
-    try:
-        intl_check = decrypted.decode()
-    except UnicodeDecodeError:
-        print("invalid l3 value", decrypted)
-        return BrowserCheckResult.TAMPERED, decrypted
-
+    intl_check = browserdata["localestring"]
     if intl_check.count("|") != 1:
-        print("invalid l3 | count", intl_check)
+        print("invalid localestring | count", intl_check)
         return BrowserCheckResult.TAMPERED, intl_check.encode()
     # firefox seems to have issues with this
     elif (
         intl_check.split("|")[0] != intl_check.split("|")[1]
         and browser != Browser.FIREFOX
     ):
-        print("invalid l3 values", intl_check)
+        print("invalid localestring values", intl_check)
         return BrowserCheckResult.SUSPICIOUS, intl_check.encode()
 
     return BrowserCheckResult.OK, intl_check.encode()
 
 
 def check_fonts(
-    browserdata: BrowserData, base_seed: bytes, platform: Platform
+    browserdata: BrowserData, platform: Platform
 ) -> tuple[BrowserCheckResult, set[str]]:
-    key = crc32(bytes([x ^ 84 for x in base_seed])).to_bytes(4, "big")
-    decoded = b64parse(browserdata["f"])
-    if decoded is None:
-        print("f is not valid base64", browserdata)
-        return BrowserCheckResult.BAD_REQUEST, set()
-
-    offset = 0
-    fonts = set()
-    while offset < len(decoded):
-        length = decoded[offset] ^ 15 ^ key[3]
-        # this can be used for fingerprinting in the future
-        font_checksum = int.from_bytes(
-            bytes(
-                [x ^ key[i % 4] for i, x in enumerate(decoded[offset + 1 : offset + 5])]
-            ),
-            "big",
-        )
-        decrypted = bytes(
-            [
-                x ^ key[(offset + 5 + i) % 4]
-                for i, x in enumerate(decoded[offset + 5 : offset + 5 + length])
-            ]
-        )
-        offset += 5 + length
-        try:
-            font = decrypted.decode()
-        except UnicodeDecodeError:
-            print("invalid f value", length, font_checksum, decrypted)
-            return BrowserCheckResult.TAMPERED, set()
-        fonts.add(font)
-
-    print("f", fonts)
+    fonts = set(browserdata["fonts"])
     if fonts & APPLE_FONTS:
         if platform not in {Platform.MAC, Platform.IOS}:
             print("apple fonts, but not apple platform", platform)
@@ -453,35 +308,14 @@ def check_fonts(
     return BrowserCheckResult.OK, fonts
 
 
-def check_connection_rtt(
-    browserdata: BrowserData, base_seed: bytes
-) -> BrowserCheckResult:
-    key = crc32(bytes([x ^ 155 for x in base_seed])).to_bytes(4, "big")
-    decoded = b64parse(browserdata["r"])
-    if decoded is None:
-        print("r is not valid base64", browserdata)
-        return BrowserCheckResult.BAD_REQUEST
-    rtt = decoded[1] ^ key[3]
-    if rtt == 0:
-        print("0 rtt detected")
-        return BrowserCheckResult.SUSPICIOUS
-    return BrowserCheckResult.OK
-
-
 def check_browser_engine(
-    browserdata: BrowserData, base_seed: bytes, browser: Browser
+    browserdata: BrowserData, browser: Browser
 ) -> BrowserCheckResult:
-    key = crc32(bytes([x ^ 71 for x in base_seed])).to_bytes(4, "big")
-    decoded = b64parse(browserdata["e"])
-    if decoded is None:
-        print("e is not valid base64", browserdata)
-        return BrowserCheckResult.BAD_REQUEST
+    if browserdata["engine"].count("|") != 1:
+        print("browser engine value is spoofed", browserdata["engine"])
+        return BrowserCheckResult.TAMPERED
 
-    decrypted = bytes([x ^ key[i % 4] for i, x in enumerate(decoded)])
-    tofixed_length = decoded[0] ^ key[2]
-    print("e", decrypted, tofixed_length)
-
-    tofixed_data = decrypted[1 : 1 + tofixed_length]
+    tofixed_data, native_data = browserdata["engine"].split("|")
 
     match tofixed_data:
         case b"toFixed() digits argument must be between 0 and 100":
@@ -503,7 +337,6 @@ def check_browser_engine(
         )
         return BrowserCheckResult.TAMPERED
 
-    native_data = decrypted[1 + tofixed_length :]
     match native_data:
         case b"function () { [native code] }":
             native_browser = {Browser.CHROMIUM}
@@ -525,27 +358,24 @@ def check_browser_engine(
     return BrowserCheckResult.OK
 
 
-def check_detections(
-    browserdata: BrowserData, base_seed: bytes, browser: Browser
-) -> BrowserCheckResult:
-    key = crc32(bytes([x ^ 142 for x in base_seed])).to_bytes(4, "big")
-    decoded = b64parse(browserdata["k"])
-    if decoded is None:
-        print("k is not valid base64", browserdata)
-        return BrowserCheckResult.BAD_REQUEST
-    elif len(decoded) % 2 == 1 or len(decoded) < 40:
-        print("k has incorrect length", len(decoded), decoded, browserdata)
-        return BrowserCheckResult.BAD_REQUEST
+def check_detections(browserdata: BrowserData, browser: Browser) -> BrowserCheckResult:
+    try:
+        all_detections = list(map(int, browserdata["detections"].split(",")))
+    except ValueError:
+        print("detections contains non-int", browserdata["detections"])
+        return BrowserCheckResult.TAMPERED
 
-    decrypted = bytes([x ^ key[i % 4] ^ i & 0xFF for i, x in enumerate(decoded)])
+    if len(all_detections) < 10:
+        print("not enough detections", all_detections)
+        return BrowserCheckResult.TAMPERED
+
     browsers = {Browser.CHROMIUM, Browser.WEBKIT, Browser.FIREFOX}
     detections = []
     results: list[BrowserCheckResult] = []
-    for i in range(0, len(decrypted), 2):
-        detection = int.from_bytes(decrypted[i : i + 2], "big")
+    for detection in all_detections:
         category = detection >> 12
         if category:
-            detections.append(decrypted[i : i + 2].hex())
+            detections.append(hex(category)[2:].zfill(4))
         match category:
             case 0:  # filler
                 pass
@@ -568,7 +398,7 @@ def check_detections(
                 #   00 something in window ending with `_Symbol`
                 #   01 something in iframe window ending with `_Symbol`
                 #   02 navigator.webdriver is truthy
-                print("failed automated browser check", hex(detection))
+                print("failed automated browser check", hex(detection)[2:].zfill(4))
                 results.append(BrowserCheckResult.AUTOMATED)
             case 2:  # suspicious stuff
                 # 0000 pdf disabled
@@ -582,13 +412,12 @@ def check_detections(
                     case 0x3004:
                         browsers &= {Browser.WEBKIT}
                     case _:
-                        print("unknown brower check", detection, hex(detection))
+                        print("unknown brower check", hex(detection)[2:].zfill(4))
                         results.append(BrowserCheckResult.TAMPERED)
             case _:
-                print("unknown detection", detection)
+                print("unknown detection", hex(detection)[2:].zfill(4))
                 results.append(BrowserCheckResult.TAMPERED)
 
-    print("k", detections)
     if len(browsers) != 1:
         print("unable to identify browser", browsers)
         results.append(BrowserCheckResult.SUSPICIOUS)
@@ -604,55 +433,38 @@ def check_detections(
     return BrowserCheckResult.OK
 
 
-def check_picasso(
-    browserdata: BrowserData, base_seed: bytes
-) -> tuple[BrowserCheckResult, int]:
-    key = crc32(bytes([x ^ 99 for x in base_seed])).to_bytes(4, "big")
-    decoded = b64parse(browserdata["fp"])
-    if decoded is None:
-        print("fp is not valid base64", browserdata)
-        return BrowserCheckResult.BAD_REQUEST, 0
-    elif len(decoded) % 12 != 0 or len(decoded) < 24:
-        print("fp has incorrect length", len(decoded), decoded, browserdata)
-        return BrowserCheckResult.BAD_REQUEST, 0
+def check_picasso(browserdata: BrowserData) -> tuple[BrowserCheckResult, int]:
+    if len(browserdata["picasso"]) != 24 or not all(
+        x in "0123456789abcdef" for x in browserdata["picasso"]
+    ):
+        print("picasso has incorrect length/values", browserdata["picasso"])
+        return BrowserCheckResult.TAMPERED, 0
 
-    decrypted_stage1 = bytes([x ^ key[i % 4] ^ i & 0xFF for i, x in enumerate(decoded)])
-    fingerprints = set()
-    for i in range(0, len(decrypted_stage1), 12):
-        rkey = int.from_bytes(decrypted_stage1[i : i + 4], "big") ^ 0xD0BED0AA
-        fp = int.from_bytes(decrypted_stage1[i + 4 : i + 8], "big") ^ rkey
-        checksum = int.from_bytes(decrypted_stage1[i + 8 : i + 12], "big") ^ 0xFBE2088E
+    picasso = bytes.fromhex(browserdata["picasso"])
 
-        expected_checksum = crc32(decrypted_stage1[i : i + 8])
-        if expected_checksum != checksum:
-            print("fp has incorrect checksum", fp, checksum, expected_checksum)
-            return BrowserCheckResult.TAMPERED, 0
+    rkey = int.from_bytes(picasso[:4], "big") ^ 0xD0BED0AA
+    fp = int.from_bytes(picasso[4:8], "big") ^ rkey
+    checksum = int.from_bytes(picasso[8:], "big") ^ 0xFBE2088E
 
-        fingerprints.add(fp)
+    expected_checksum = crc32(picasso[:8])
+    if expected_checksum != checksum:
+        print("picasso has incorrect checksum", fp, checksum, expected_checksum)
+        return BrowserCheckResult.TAMPERED, 0
 
-    if len(fingerprints) != 1:
-        print("fp too many", fingerprints)
-        return BrowserCheckResult.SUSPICIOUS, 0
-
-    (fp,) = fingerprints
-    print("fp", fp)
     return BrowserCheckResult.OK, fp
 
 
 class BrowserData(typing.TypedDict):
-    t1: int
-    t2: int
-    t3: int
-    tc: int
-    s: int
-    m1: str
-    m2: str
-    p1: str
-    l1: str
-    l2: str
-    l3: str
-    f: str
-    r: str
-    e: str
-    k: str
-    fp: str
+    picasso: str
+    detections: str
+    localestring: str
+    math_pow: str
+    math_sinh: str
+    time: str
+    engine: str
+    fonts: str
+    navigator_webdriver: bool
+    navigator_language: str
+    navigator_platform: str
+    document_location: str
+    token: str
