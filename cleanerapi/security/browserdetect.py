@@ -330,11 +330,11 @@ def check_browser_engine(
     tofixed_data, native_data = browserdata["engine"].split("|")
 
     match tofixed_data:
-        case b"toFixed() digits argument must be between 0 and 100":
+        case "toFixed() digits argument must be between 0 and 100":
             tofixed_browser = Browser.CHROMIUM  # V8
-        case b"precision -1 out of range":
+        case "precision -1 out of range":
             tofixed_browser = Browser.FIREFOX  # SpiderMonkey
-        case b"toFixed() argument must be between 0 and 100":
+        case "toFixed() argument must be between 0 and 100":
             tofixed_browser = Browser.WEBKIT  # JavaScriptCore
         case _:
             print("unknown engine", tofixed_data)
@@ -350,9 +350,9 @@ def check_browser_engine(
         return BrowserCheckResult.TAMPERED
 
     match native_data:
-        case b"function () { [native code] }":
+        case "function () { [native code] }":
             native_browser = {Browser.CHROMIUM}
-        case b"function () {\n    [native code]\n}":
+        case "function () {\n    [native code]\n}":
             native_browser = {Browser.WEBKIT, Browser.FIREFOX}
         case _:
             print("unknown engine", native_data)
