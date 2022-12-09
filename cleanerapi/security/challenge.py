@@ -116,6 +116,9 @@ async def verify_request(
     database = typing.cast(Redis[bytes], request.app.ctx.database)
     captchas = ["button", "turnstile"]
 
+    if await database.exists((f"cache:ip:{request.ip}:banned",)):
+        return text("Ratelimit reached", 429)
+
     try:
         cr = ChallengeRequest.parse_obj(request.json)
     except ValidationError:
@@ -226,10 +229,7 @@ async def verify_request(
     if picasso_matching == 1:
         await database.expire(f"cache:picasso:{picasso}", 300)
 
-    if (
-        await database.exists((f"cache:ip:{request.ip}:banned",))
-        or picasso_matching > 30
-    ):
+    if picasso_matching > 30:
         return text("Ratelimit reached", 429)
 
     match result:
