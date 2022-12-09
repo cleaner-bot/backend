@@ -6,7 +6,7 @@ from . import bansync, guilds, info, mfa, statistics
 user_bp = Blueprint.group(bansync.bp, guilds.bp, info.bp, mfa.bp, statistics.bp)
 
 
-@user_bp.middleware("request")
+@user_bp.middleware("request")  # type: ignore
 async def authentication_middleware(request: Request) -> HTTPResponse | None:
     database = request.app.ctx.database
     request.ctx.user_token = user_token = await parse_user_token(request, database)

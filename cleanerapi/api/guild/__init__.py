@@ -12,7 +12,7 @@ guild_bp = Blueprint.group(
 )
 
 
-@guild_bp.middleware("request")
+@guild_bp.middleware("request")  # type: ignore
 async def authentication_middleware(request: Request) -> HTTPResponse | None:
     database = request.app.ctx.database
     request.ctx.user_token = user_token = await parse_user_token(request, database)
