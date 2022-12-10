@@ -3,6 +3,7 @@ import json
 import typing
 from base64 import b64encode
 from binascii import crc32
+from datetime import datetime
 
 from httpx import AsyncClient
 from sanic import Request, Sanic
@@ -12,7 +13,9 @@ from ..helpers.based import b64parse
 
 class CaptchaProvider:
     @classmethod
-    async def verify(cls, request: Request, *, token: str, signature: bytes) -> bool:
+    async def verify(
+        cls, request: Request, *, token: str, signature: bytes, minimum_timestamp: int
+    ) -> bool:
         raise NotImplementedError
 
     @classmethod
@@ -24,7 +27,9 @@ class CaptchaProvider:
 
 class HCaptchaProvider(CaptchaProvider):
     @classmethod
-    async def verify(cls, request: Request, *, token: str, signature: bytes) -> bool:
+    async def verify(
+        cls, request: Request, *, token: str, signature: bytes, minimum_timestamp: int
+    ) -> bool:
         http_client = typing.cast(AsyncClient, request.app.ctx.http_client)
         res = await http_client.post(
             "https://hcaptcha.com/siteverify",
@@ -37,7 +42,10 @@ class HCaptchaProvider(CaptchaProvider):
         )
         data = typing.cast(HCaptchaResponse, res.json())
         print("hcaptcha -", data)
-        return data["success"]
+        return data["success"] and (
+            datetime.fromisoformat(data["challenge_ts"][:-1]).timestamp()
+            >= minimum_timestamp
+        )
 
     @classmethod
     def challenge_parameters(
@@ -48,7 +56,9 @@ class HCaptchaProvider(CaptchaProvider):
 
 class TurnstileProvider(CaptchaProvider):
     @classmethod
-    async def verify(cls, request: Request, *, token: str, signature: bytes) -> bool:
+    async def verify(
+        cls, request: Request, *, token: str, signature: bytes, minimum_timestamp: int
+    ) -> bool:
         http_client = typing.cast(AsyncClient, request.app.ctx.http_client)
         res = await http_client.post(
             "https://challenges.cloudflare.com/turnstile/v0/siteverify",
@@ -61,9 +71,14 @@ class TurnstileProvider(CaptchaProvider):
         )
         data = typing.cast(TurnstileResponse, res.json())
         print("turnstile -", data)
-        if data.get("cdata", "") != signature.hex():
-            return False
-        return data["success"]
+        return (
+            data["success"]
+            and data.get("cdata", "") == signature.hex()
+            and (
+                datetime.fromisoformat(data["challenge_ts"][:-1]).timestamp()
+                >= minimum_timestamp
+            )
+        )
 
     @classmethod
     def challenge_parameters(
@@ -80,7 +95,9 @@ class ButtonProvider(CaptchaProvider):
         return int.from_bytes(signature[:6], "big", signed=True)
 
     @classmethod
-    async def verify(cls, request: Request, *, token: str, signature: bytes) -> bool:
+    async def verify(
+        cls, request: Request, *, token: str, signature: bytes, minimum_timestamp: int
+    ) -> bool:
         decoded = b64parse(token)
         if decoded is None:
             print("button - not valid b64", token)
@@ -153,7 +170,9 @@ class ProofOfWorkProvider(CaptchaProvider):
     DIFFICULTY = 17
 
     @classmethod
-    async def verify(cls, request: Request, *, token: str, signature: bytes) -> bool:
+    async def verify(
+        cls, request: Request, *, token: str, signature: bytes, minimum_timestamp: int
+    ) -> bool:
         try:
             data = json.loads(token)
         except json.decoder.JSONDecodeError:

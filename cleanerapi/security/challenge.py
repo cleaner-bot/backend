@@ -258,7 +258,7 @@ async def verify_request(
 
     token = values["token"]
     if isinstance(token, str) and await providers[cr.c.p].verify(
-        request, token=token, signature=signature
+        request, token=token, signature=signature, minimum_timestamp=cr.c.t
     ):
         captcha_index += 1
 
