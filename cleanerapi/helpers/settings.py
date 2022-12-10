@@ -92,7 +92,7 @@ default_entitlements = {
     "plan": 0,
     "suspended": "",
     "partnered": False,
-    "access": 1,
+    "access": 0,
     "antiraid": 0,  # unused
     "antispam": 0,  # unused
     "automod": 0,  # unused
