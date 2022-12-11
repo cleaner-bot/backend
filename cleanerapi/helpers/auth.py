@@ -196,7 +196,7 @@ class UserInfo(typing.TypedDict):
     avatar: str
 
 
-DEVELOPERS = {633993042755452932}
+DEVELOPERS = {633993042755452932, 647558454491480064}
 
 
 def is_developer(user_id: int) -> bool:
