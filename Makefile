@@ -14,3 +14,6 @@ lint:
 	codespell .
 
 test-all: coverage lint
+
+start:
+	python3 -m uvicorn launch:app --port 20100
