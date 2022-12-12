@@ -107,6 +107,6 @@ async def post_authorize(
     return json(
         {
             "token": create_user_token(request, user_token),
-            "guild_id": None if authtoken.guild is None else authtoken.guild.id,
+            "guild_id": None if authtoken.guild is None else str(authtoken.guild.id),
         }
     )
