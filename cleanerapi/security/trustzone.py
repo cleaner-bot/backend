@@ -711,7 +711,7 @@ checks = (
             "set i, 0",
             "jumptarget picasso_start",
             'set &fraction, ["1.5"]',
-            "syscall &pica, 3, 69, 300, 300, 2001000001, 15000, &fraction, 50",
+            "syscall &pica, 3, 10, 69, 300, 300, 2001000001, 15000, &fraction, 50",
             "index_store submit_picasso, &pica, 0",
             "index_store cond, &pica, 1",
             "seq cond, stored_picahash",
