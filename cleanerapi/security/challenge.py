@@ -197,10 +197,11 @@ async def verify_request(
 
     fields.extend(
         (
-            ("Captcha stage", str(cr.c.i), False),
+            ("\u200B", "\u200B", False),
             ("CAPTCHA", f"{cr.c.i}/{cr.c.p}", True),
             ("Issue time", f"<t:{cr.c.t}>", True),
-            ("Request FP", f"`{request_fp.hex()[:8]}...`", False),
+            ("\u200B", "\u200B", False),
+            ("Request FP", f"`{request_fp.hex()[:8]}...`", True),
         )
     )
 
@@ -256,7 +257,8 @@ async def verify_request(
         (
             ("Browser FP", f"`{fp.hex()[:8]}...`", True),
             ("Picasso", f"`{picasso:>08x}`", True),
-            ("Browser result", result.verdict.name, False),
+            ("\u200B", "\u200B", False),
+            ("Browser result", result.verdict.name, True),
         )
     )
     if result.reason:
