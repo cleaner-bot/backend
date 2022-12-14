@@ -12,6 +12,7 @@ from functools import reduce
 from operator import xor
 
 from coredis import Redis
+from httpx import AsyncClient
 from pydantic import BaseModel, ValidationError, conint, constr
 from sanic import HTTPResponse, Request, json, text
 
@@ -110,18 +111,49 @@ def checksum(value: int | str) -> int:
     return crc32(value.encode())
 
 
+async def log_request(
+    request: Request, fields: list[tuple[str, str, bool]], description: str
+) -> None:
+    http_client = typing.cast(AsyncClient, request.app.ctx.http_client)
+    webhook = request.app.config.VERIFICATION_WEBHOOK
+    await http_client.post(
+        webhook,
+        json={
+            "embeds": [
+                {
+                    "description": description,
+                    "fields": [
+                        {"name": name, "value": value, "inline": inline}
+                        for name, value, inline in fields
+                    ],
+                }
+            ]
+        },
+    )
+
+
 async def verify_request(
     request: Request, requirement: CaptchaRequirement
 ) -> HTTPResponse | None:
     database = typing.cast(Redis[bytes], request.app.ctx.database)
     captchas = ["button", "turnstile"]
+    fields: list[tuple[str, str, bool]] = [
+        ("Visitor IP", f"||{request.ip}||", True),
+        ("Unique", requirement.unique, True),
+        ("Level", requirement.level.name, True),
+    ]
 
     if await database.exists((f"cache:ip:{request.ip}:banned",)):
+        await log_request(request, fields, "IP is banned")
         return text("Ratelimit reached", 429)
+    elif "b" not in request.json or "c" not in request.json:
+        await log_request(request, fields, "Initial request")
+        return generate_response(request, requirement.unique, 0, captchas)
 
     try:
         cr = ChallengeRequest.parse_obj(request.json)
     except ValidationError:
+        await log_request(request, fields, "Invalid request")
         return generate_response(request, requirement.unique, 0, captchas)
 
     if (
@@ -134,19 +166,7 @@ async def verify_request(
         )
         or reduce(xor, map(checksum, cr.b)) != cr.c.vc & 0xFFFFFFFF
     ):
-        print(
-            "failed checksum check",
-            all(isinstance(x, int) for x in cr.b[1::2]),
-            all(
-                checksum(cr.b[i])
-                ^ 0x735A20DC
-                ^ crc32(bytes([i, 0x0C, 0x88, 0x59, 0xDD]))
-                != cr.b[i + 1]
-                for i in range(len(cr.b), 2)
-            ),
-            reduce(xor, map(checksum, cr.b)),
-            cr.c.vc & 0xFFFFFFFF,
-        )
+        await log_request(request, fields, "Checksum checks failed")
         return generate_response(request, requirement.unique, 0, captchas)
 
     signature = b64parse(cr.c.h)
@@ -157,7 +177,7 @@ async def verify_request(
         or encrypted_trustzone_keys is None
         or cr.c.p not in providers
     ):
-        print("invalid signature", signature, encrypted_trustzone_keys, cr.c.p)
+        await log_request(request, fields, "Invalid signature")
         return generate_response(request, requirement.unique, 0, captchas)
 
     request_fp = fingerprint_request(request, "chl")
@@ -174,11 +194,20 @@ async def verify_request(
         "sha256",
     ).digest()
 
+    fields.extend(
+        (
+            ("Captcha stage", str(cr.c.i), False),
+            ("CAPTCHA", f"{cr.c.i}/{cr.c.p}", True),
+            ("Issue time", f"<t:{cr.c.t}>", True),
+            ("Request FP", f"`{request_fp.hex()[:8]}...`", False),
+        )
+    )
+
     if not hmac.compare_digest(signature, expected_signature):
-        print("signature does not match", signature, expected_signature)
+        await log_request(request, fields, "Signature check failed")
         return generate_response(request, requirement.unique, 0, captchas)
     elif time.time() > cr.c.t + 300:
-        print("challenge timed out", int(time.time()), cr.c.t)
+        await log_request(request, fields, "Challenge timed out")
         return generate_response(request, requirement.unique, 0, captchas)
 
     rnd = random.Random(
@@ -198,9 +227,7 @@ async def verify_request(
     ]
 
     if 2 * len(trustzone_keys) != len(cr.b):
-        print(
-            "not matching amount of trustzone keys", 2 * len(trustzone_keys), len(cr.b)
-        )
+        await log_request(request, fields, "Invalid trustzone keys amount")
         return generate_response(request, requirement.unique, captcha_index, captchas)
 
     try:
@@ -212,7 +239,7 @@ async def verify_request(
             },
         )
     except UnicodeDecodeError:
-        print("failed to decode part of challenge solution")
+        await log_request(request, fields, "Failed to decode challenge results")
         return generate_response(request, requirement.unique, captcha_index, captchas)
 
     if requirement.level == SecurityLevel.CAPTCHA:
@@ -224,12 +251,22 @@ async def verify_request(
     result, fp, picasso = browser_check(request, values)
 
     print("browser check", fp, picasso)
+    fields.extend(
+        (
+            ("Browser FP", f"`{fp.hex()[:8]}...`", True),
+            ("Picasso", f"`{picasso:>08x}`", True),
+            ("Browser result", result.verdict.name, False),
+        )
+    )
+    if result.reason:
+        fields.append(("Reason", result.reason, True))
 
     picasso_matching = await database.incr(f"cache:picasso:{picasso}")
     if picasso_matching == 1:
         await database.expire(f"cache:picasso:{picasso}", 300)
 
     if picasso_matching > 30:
+        await log_request(request, fields, "Picasso limit reached")
         return text("Ratelimit reached", 429)
 
     match result.verdict:
@@ -245,21 +282,31 @@ async def verify_request(
                 ("pow", "hcaptcha", "turnstile", "button", "pow", "hcaptcha")
             )
 
-    if result != BrowserCheckVerdict.OK and requirement.level == SecurityLevel.RAID:
+    if (
+        result.verdict != BrowserCheckVerdict.OK
+        and requirement.level == SecurityLevel.RAID
+    ):
+        await log_request(request, fields, "Blocked due to raid")
         return text("Temporarily unavailable.", 403)
 
     if await is_request_from_proxy(request):
+        fields.append(("Is proxy", ":white_check_mark:", False))
         if requirement.level == SecurityLevel.RAID:
+            await log_request(request, fields, "Blocked due to raid")
             return text("Temporarily unavailable.", 403)
         captchas.append("hcaptcha")
 
     if cr.c.p != captchas[captcha_index]:
+        await log_request(request, fields, "Solved unexpected CAPTCHA")
         return generate_response(request, requirement.unique, captcha_index, captchas)
 
     token = values["token"]
     if isinstance(token, str) and await providers[cr.c.p].verify(
         request, token=token, signature=signature, minimum_timestamp=cr.c.t
     ):
+        fields.append(("CAPTCHA valid", ":white_check_mark:", False))
         captcha_index += 1
+    else:
+        fields.append(("CAPTCHA invalid", ":x:", False))
 
     return generate_response(request, requirement.unique, captcha_index, captchas)
