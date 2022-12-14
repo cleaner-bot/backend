@@ -140,7 +140,7 @@ async def verify_request(
     captchas = ["button", "turnstile"]
     fields: list[tuple[str, str, bool]] = [
         ("Visitor IP", f"||{request.ip}||", True),
-        ("Unique", requirement.unique, True),
+        ("Unique", f"`{requirement.unique}`", True),
         ("Level", requirement.level.name, True),
     ]
 
