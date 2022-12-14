@@ -6,7 +6,7 @@ from binascii import crc32
 from sanic import Request
 
 
-class BrowserCheckResult(enum.Enum):
+class BrowserCheckVerdict(enum.Enum):
     OK = 0
     SUSPICIOUS = 1
     TAMPERED = 2
@@ -30,6 +30,13 @@ class Platform(enum.Enum):
     UNKNOWN = enum.auto()
 
 
+class BrowserCheckResult(typing.NamedTuple):
+    verdict: BrowserCheckVerdict
+    browser: Browser | None | None = None
+    platform: Platform | None | None = None
+    reason: str | None = None
+
+
 SEC_FETCH_BROWSERS = {Browser.FIREFOX, Browser.CHROMIUM}
 SEC_FETCH_HEADERS = {"sec-fetch-dest", "sec-fetch-mode", "sec-fetch-site"}
 SEC_CH_UA_BROWSERS = {Browser.CHROMIUM}
@@ -46,7 +53,7 @@ APPLE_FONTS = {
     "Luminari",
     "PingFang HK Light",
     "Futura Bold",
-    "Valvji",
+    "Galvji",
     "Chakra Petch",
 }
 LINUX_FONTS = {
@@ -84,32 +91,29 @@ def browser_check(
     # using a string compare cuz everything else just does not work
     if browserdata_shape != BrowserData.__annotations__:
         print("shape of browserdata does not match", browserdata_shape, browserdata)
-        return BrowserCheckResult.BAD_REQUEST, b"", 0
+        return (
+            BrowserCheckResult(
+                BrowserCheckVerdict.BAD_REQUEST, reason="Invalid request shape"
+            ),
+            b"",
+            0,
+        )
 
     time_result = check_time(browserdata)
-    math_result, browser = check_math(browserdata)
-    browser_headers_result = check_browser_headers(request, browser)
-    platform_result, platform = check_platform(browserdata)
-    platform_ch_result = check_platform_ch(request, browser, platform)
+    math_result = check_math(browserdata)
+    browser_headers_result = check_browser_headers(request)
+    platform_result = check_platform(browserdata)
+    platform_ch_result = check_platform_ch(request)
     url_result, url = check_url(browserdata)
     locale_result, locale = check_locale(browserdata, request)
-    locale_spoof_result, locale_spoof = check_locale_spoof(browserdata, browser)
-    fonts_result, fonts = check_fonts(browserdata, platform)
-    browser_engine_result = check_browser_engine(browserdata, browser)
-    detections_result = check_detections(browserdata, browser)
-    picasso_result, picasso_fingerprint = check_picasso(browserdata)
-
-    fingerprint = b"\x00".join(
-        [
-            browser.name.encode(),
-            platform.name.encode(),
-            url,
-            locale,
-            locale_spoof,
-            picasso_fingerprint.to_bytes(4, "big"),
-            *map(str.encode, fonts),
-        ]
+    assert math_result.browser
+    locale_spoof_result, locale_spoof = check_locale_spoof(
+        browserdata, math_result.browser
     )
+    fonts_result, fonts = check_fonts(browserdata)
+    detections_result = check_detections(browserdata)
+    browser_engine_result = check_browser_engine(browserdata)
+    picasso_result, picasso_fingerprint = check_picasso(browserdata)
 
     results = [
         time_result,
@@ -126,142 +130,150 @@ def browser_check(
         picasso_result,
     ]
 
-    return max(results, key=lambda x: x.value), fingerprint, picasso_fingerprint
+    browsers = set(x.browser for x in results if x.browser)
+    if len(browsers) == 1:
+        (browser,) = browsers
+    else:
+        browser = Browser.UNKNOWN
+
+    platforms = set(x.platform for x in results if x.platform)
+    if len(browsers) == 1:
+        (platform,) = platforms
+    else:
+        platform = Platform.UNKNOWN
+
+    if browser == Browser.UNKNOWN:
+        results.append(
+            BrowserCheckResult(
+                BrowserCheckVerdict.SUSPICIOUS, reason="Conflicting browser results"
+            )
+        )
+    if platform == Platform.UNKNOWN:
+        results.append(
+            BrowserCheckResult(
+                BrowserCheckVerdict.SUSPICIOUS, reason="Conflicting platform results"
+            )
+        )
+
+    fingerprint = b"\x00".join(
+        [
+            browser.name.encode(),
+            platform.name.encode(),
+            url,
+            locale,
+            locale_spoof,
+            picasso_fingerprint.to_bytes(4, "big"),
+            *map(str.encode, fonts),
+        ]
+    )
+
+    return max(results, key=lambda x: x.verdict.value), fingerprint, picasso_fingerprint
 
 
 def check_time(browserdata: BrowserData) -> BrowserCheckResult:
     if not browserdata["time"].isdigit():
         print("time is not an integer", browserdata["time"])
-        return BrowserCheckResult.BAD_REQUEST
+        return BrowserCheckResult(
+            BrowserCheckVerdict.BAD_REQUEST, reason="Time is not an integer"
+        )
 
     time_delta = abs(int(browserdata["time"]) - time.time() * 1000)
     if time_delta > 60_000:
         print("time delta too large", time_delta, browserdata)
-        return BrowserCheckResult.SUSPICIOUS
+        return BrowserCheckResult(
+            BrowserCheckVerdict.SUSPICIOUS, reason="Request too old"
+        )
 
-    return BrowserCheckResult.OK
+    return BrowserCheckResult(BrowserCheckVerdict.OK)
 
 
-def check_math(browserdata: BrowserData) -> tuple[BrowserCheckResult, Browser]:
+def check_math(browserdata: BrowserData) -> BrowserCheckResult:
     browsers = {Browser.WEBKIT, Browser.CHROMIUM, Browser.FIREFOX}
     if browserdata["math_pow"] == "1.9275814160560204e-50":
         browsers &= {Browser.CHROMIUM}
     elif browserdata["math_pow"] == "1.9275814160560206e-50":
         browsers &= {Browser.WEBKIT, Browser.FIREFOX}
     else:
-        print("invalid m1 value", browserdata["math_pow"])
-        return BrowserCheckResult.SUSPICIOUS, Browser.UNKNOWN
+        print("invalid math_pow value", browserdata["math_pow"])
+        return BrowserCheckResult(
+            BrowserCheckVerdict.BAD_REQUEST,
+            browser=Browser.UNKNOWN,
+            reason="Invalid math_pow",
+        )
 
     if browserdata["math_sinh"] == "1.046919966902314e+308":
         browsers &= {Browser.FIREFOX}
     elif browserdata["math_sinh"] == "1.0469199669023138e+308":
         browsers &= {Browser.WEBKIT, Browser.CHROMIUM}
     else:
-        print("invalid m2 value", browserdata["math_sinh"])
-        return BrowserCheckResult.SUSPICIOUS, Browser.UNKNOWN
+        print("invalid math_sinh value", browserdata["math_sinh"])
+        return BrowserCheckResult(
+            BrowserCheckVerdict.SUSPICIOUS,
+            browser=Browser.UNKNOWN,
+            reason="Invalid math_sinh",
+        )
 
     if len(browsers) != 1:
         print("conflicting math results", browsers)
-        return BrowserCheckResult.SUSPICIOUS, Browser.UNKNOWN
+        return BrowserCheckResult(
+            BrowserCheckVerdict.SUSPICIOUS,
+            browser=Browser.UNKNOWN,
+            reason="Conflicting math results",
+        )
 
     (browser,) = browsers
-    return BrowserCheckResult.OK, browser
+    return BrowserCheckResult(BrowserCheckVerdict.OK, browser=browser)
 
 
-def check_browser_headers(request: Request, browser: Browser) -> BrowserCheckResult:
-    has_sec_fetch = browser in SEC_FETCH_BROWSERS
+def check_browser_headers(request: Request) -> BrowserCheckResult:
+    if request.headers.keys() & SEC_CH_UA_HEADERS != SEC_CH_UA_HEADERS:
+        return BrowserCheckResult(BrowserCheckVerdict.OK, Browser.CHROMIUM)
+    elif request.headers.keys() & SEC_FETCH_HEADERS != SEC_FETCH_HEADERS:
+        return BrowserCheckResult(BrowserCheckVerdict.OK, Browser.FIREFOX)
 
-    if (
-        has_sec_fetch
-        and request.headers.keys() & SEC_FETCH_HEADERS != SEC_FETCH_HEADERS
-    ):
-        print(
-            "request does not have all required sec-fetch-* headers",
-            browser,
-            tuple(request.headers.keys()),
-        )
-        return BrowserCheckResult.TAMPERED
-    elif not has_sec_fetch and request.headers.keys() & SEC_FETCH_HEADERS:
-        print(
-            "request should not have sec-fetch-* headers",
-            browser,
-            tuple(request.headers.keys()),
-        )
-        return BrowserCheckResult.TAMPERED
-
-    has_sec_ch_ua = browser in SEC_CH_UA_BROWSERS
-
-    if (
-        has_sec_ch_ua
-        and request.headers.keys() & SEC_CH_UA_HEADERS != SEC_CH_UA_HEADERS
-    ):
-        print(
-            "request does not have all required sec-ch-ua-* headers",
-            browser,
-            tuple(request.headers.keys()),
-        )
-        return BrowserCheckResult.TAMPERED
-    elif not has_sec_ch_ua and request.headers.keys() & SEC_CH_UA_HEADERS:
-        print(
-            "request should not have sec-ch-ua-* headers",
-            browser,
-            tuple(request.headers.keys()),
-        )
-        return BrowserCheckResult.TAMPERED
-
-    return BrowserCheckResult.OK
+    return BrowserCheckResult(BrowserCheckVerdict.OK, Browser.WEBKIT)
 
 
-def check_platform(browserdata: BrowserData) -> tuple[BrowserCheckResult, Platform]:
+def check_platform(browserdata: BrowserData) -> BrowserCheckResult:
     platform = browserdata["navigator_platform"]
     if platform.startswith("iP"):
-        return BrowserCheckResult.OK, Platform.IOS
+        return BrowserCheckResult(BrowserCheckVerdict.OK, platform=Platform.IOS)
     elif platform.startswith("Mac"):
-        return BrowserCheckResult.OK, Platform.MAC
+        return BrowserCheckResult(BrowserCheckVerdict.OK, platform=Platform.MAC)
     elif platform.startswith("Linux"):
-        return BrowserCheckResult.OK, Platform.LINUX
+        return BrowserCheckResult(BrowserCheckVerdict.OK, platform=Platform.LINUX)
     elif platform.startswith("Win"):
-        return BrowserCheckResult.OK, Platform.WINDOWS
-    return BrowserCheckResult.OK, Platform.UNKNOWN
+        return BrowserCheckResult(BrowserCheckVerdict.OK, platform=Platform.WINDOWS)
+    return BrowserCheckResult(BrowserCheckVerdict.OK, platform=Platform.UNKNOWN)
 
 
-def check_platform_ch(
-    request: Request, browser: Browser, platform: Platform
-) -> BrowserCheckResult:
-    if browser not in SEC_CH_UA_BROWSERS:
-        return BrowserCheckResult.OK  # N/A
-
+def check_platform_ch(request: Request) -> BrowserCheckResult:
+    if "sec-ch-ua-platform" not in request.headers:
+        return BrowserCheckResult(BrowserCheckVerdict.OK)
     ch_platform_header = (
         request.headers.get("sec-ch-ua-platform", "").replace('"', "").replace("'", "")
     )
+
     match ch_platform_header:
         case "Android":
-            ch_platform = Platform.ANDROID
+            return BrowserCheckResult(BrowserCheckVerdict.OK, platform=Platform.ANDROID)
         case "iOS":
-            ch_platform = Platform.IOS
+            return BrowserCheckResult(BrowserCheckVerdict.OK, platform=Platform.IOS)
         case "Linux":
-            ch_platform = Platform.LINUX
+            return BrowserCheckResult(BrowserCheckVerdict.OK, platform=Platform.LINUX)
         case "macOS":
-            ch_platform = Platform.MAC
+            return BrowserCheckResult(BrowserCheckVerdict.OK, platform=Platform.MAC)
         case "Windows":
-            ch_platform = Platform.WINDOWS
+            return BrowserCheckResult(BrowserCheckVerdict.OK, platform=Platform.WINDOWS)
         case _:
-            ch_platform = Platform.UNKNOWN
-
-    if ch_platform != platform:
-        print(
-            "platform in sec-ch-ua-platform header does not match",
-            platform,
-            ch_platform,
-            ch_platform_header,
-        )
-        return BrowserCheckResult.SUSPICIOUS
-
-    return BrowserCheckResult.OK
+            return BrowserCheckResult(BrowserCheckVerdict.OK, platform=Platform.UNKNOWN)
 
 
 def check_url(browserdata: BrowserData) -> tuple[BrowserCheckResult, bytes]:
-    return BrowserCheckResult.OK, browserdata["document_location"].encode()
+    return (
+        BrowserCheckResult(BrowserCheckVerdict.OK),
+        browserdata["document_location"].encode(),
+    )
 
 
 def check_locale(
@@ -271,9 +283,12 @@ def check_locale(
     accept_language = request.headers.get("accept-language")
     if accept_language is None or locale not in accept_language:
         print("invalid locale", locale, accept_language)
-        return BrowserCheckResult.TAMPERED, locale.encode()
+        return (
+            BrowserCheckResult(BrowserCheckVerdict.TAMPERED, reason="Invalid locale"),
+            locale.encode(),
+        )
 
-    return BrowserCheckResult.OK, locale.encode()
+    return BrowserCheckResult(BrowserCheckVerdict.OK), locale.encode()
 
 
 def check_locale_spoof(
@@ -282,50 +297,68 @@ def check_locale_spoof(
     intl_check = browserdata["localestring"]
     if intl_check.count("|") != 1:
         print("invalid localestring | count", intl_check)
-        return BrowserCheckResult.TAMPERED, intl_check.encode()
+        return (
+            BrowserCheckResult(
+                BrowserCheckVerdict.TAMPERED, reason="Invalid localestring"
+            ),
+            intl_check.encode(),
+        )
     # firefox seems to have issues with this
     elif (
         intl_check.split("|")[0] != intl_check.split("|")[1]
         and browser != Browser.FIREFOX
     ):
         print("invalid localestring values", intl_check)
-        return BrowserCheckResult.SUSPICIOUS, intl_check.encode()
+        return (
+            BrowserCheckResult(
+                BrowserCheckVerdict.SUSPICIOUS, reason="Mismatching localestring"
+            ),
+            intl_check.encode(),
+        )
 
-    return BrowserCheckResult.OK, intl_check.encode()
+    return BrowserCheckResult(BrowserCheckVerdict.OK), intl_check.encode()
 
 
-def check_fonts(
-    browserdata: BrowserData, platform: Platform
-) -> tuple[BrowserCheckResult, set[str]]:
+def check_fonts(browserdata: BrowserData) -> tuple[BrowserCheckResult, set[str]]:
     fonts = set(browserdata["fonts"].split("|")[:-1])
     if fonts & APPLE_FONTS:
-        if platform not in {Platform.MAC, Platform.IOS}:
-            print("apple fonts, but not apple platform", platform)
-            return BrowserCheckResult.TAMPERED, fonts
+        return (
+            BrowserCheckResult(
+                BrowserCheckVerdict.OK,
+                platform=(
+                    Platform.MAC
+                    if "American Typewriter Semibold" in fonts
+                    else Platform.IOS
+                ),
+            ),
+            fonts,
+        )
 
     elif fonts & WINDOWS_FONTS:
-        if platform != Platform.WINDOWS:
-            print("windows fonts, but not windows platform", platform)
-            return BrowserCheckResult.TAMPERED, fonts
+        return (
+            BrowserCheckResult(BrowserCheckVerdict.OK, platform=Platform.WINDOWS),
+            fonts,
+        )
 
     elif fonts & LINUX_FONTS:
-        if platform != Platform.LINUX:
-            print("linux fonts, but not linux platform", platform)
-            return BrowserCheckResult.TAMPERED, fonts
+        return (
+            BrowserCheckResult(BrowserCheckVerdict.OK, platform=Platform.LINUX),
+            fonts,
+        )
 
     else:
-        print("unknown platform for fonts")
-        return BrowserCheckResult.SUSPICIOUS, fonts
+        return (
+            BrowserCheckResult(
+                BrowserCheckVerdict.SUSPICIOUS, platform=Platform.UNKNOWN
+            ),
+            fonts,
+        )
 
-    return BrowserCheckResult.OK, fonts
 
-
-def check_browser_engine(
-    browserdata: BrowserData, browser: Browser
-) -> BrowserCheckResult:
+def check_browser_engine(browserdata: BrowserData) -> BrowserCheckResult:
     if browserdata["engine"].count("|") != 1:
         print("browser engine value is spoofed", browserdata["engine"])
-        return BrowserCheckResult.TAMPERED
+        return BrowserCheckResult(BrowserCheckVerdict.TAMPERED, reason="Engine value")
 
     tofixed_data, native_data = browserdata["engine"].split("|")
 
@@ -337,17 +370,7 @@ def check_browser_engine(
         case "toFixed() argument must be between 0 and 100":
             tofixed_browser = Browser.WEBKIT  # JavaScriptCore
         case _:
-            print("unknown engine", tofixed_data)
-            return BrowserCheckResult.SUSPICIOUS
-
-    if tofixed_browser != browser:
-        print(
-            "mismatching engine browser and actual",
-            tofixed_browser,
-            browser,
-            tofixed_data,
-        )
-        return BrowserCheckResult.TAMPERED
+            tofixed_browser = Browser.UNKNOWN
 
     match native_data:
         case "function () { [native code] }":
@@ -355,27 +378,26 @@ def check_browser_engine(
         case "function () {\n    [native code]\n}":
             native_browser = {Browser.WEBKIT, Browser.FIREFOX}
         case _:
-            print("unknown engine", native_data)
-            return BrowserCheckResult.SUSPICIOUS
+            native_browser = {Browser.UNKNOWN}
 
-    if browser not in native_browser:
-        print(
-            "mismatching engine browser and actual",
-            native_browser,
-            browser,
-            native_data,
+    if tofixed_browser not in native_browser:
+        return BrowserCheckResult(
+            BrowserCheckVerdict.TAMPERED,
+            browser=tofixed_browser,
+            reason="Mismatching browser engine",
         )
-        return BrowserCheckResult.TAMPERED
 
-    return BrowserCheckResult.OK
+    return BrowserCheckResult(BrowserCheckVerdict.OK, browser=tofixed_browser)
 
 
-def check_detections(browserdata: BrowserData, browser: Browser) -> BrowserCheckResult:
+def check_detections(browserdata: BrowserData) -> BrowserCheckResult:
     try:
         all_detections = list(map(int, browserdata["detections"].split(",")[:-1]))
     except ValueError:
         print("detections contains non-int", browserdata["detections"])
-        return BrowserCheckResult.TAMPERED
+        return BrowserCheckResult(
+            BrowserCheckVerdict.TAMPERED, reason="Detections non-int"
+        )
 
     browsers = {Browser.CHROMIUM, Browser.WEBKIT, Browser.FIREFOX}
     detections = []
@@ -408,10 +430,20 @@ def check_detections(browserdata: BrowserData, browser: Browser) -> BrowserCheck
                 #   01 something in iframe window ending with `_Symbol`
                 #   02 navigator.webdriver is truthy
                 print("failed automated browser check", hex(detection)[2:].zfill(4))
-                results.append(BrowserCheckResult.AUTOMATED)
+                results.append(
+                    BrowserCheckResult(
+                        BrowserCheckVerdict.AUTOMATED,
+                        reason=f"Detection: {detection:>04x}",
+                    )
+                )
             case 2:  # suspicious stuff
                 # 0000 pdf disabled
-                results.append(BrowserCheckResult.SUSPICIOUS)
+                results.append(
+                    BrowserCheckResult(
+                        BrowserCheckVerdict.SUSPICIOUS,
+                        reason=f"Detection: {detection:>04x}",
+                    )
+                )
             case 3:  # browser check
                 match detection:
                     case 0x3000 | 0x3001:
@@ -422,24 +454,29 @@ def check_detections(browserdata: BrowserData, browser: Browser) -> BrowserCheck
                         browsers &= {Browser.WEBKIT}
                     case _:
                         print("unknown brower check", hex(detection)[2:].zfill(4))
-                        results.append(BrowserCheckResult.TAMPERED)
+                        results.append(
+                            BrowserCheckResult(
+                                BrowserCheckVerdict.TAMPERED,
+                                reason=f"Unknown: {detection:>04x}",
+                            )
+                        )
             case _:
                 print("unknown detection", hex(detection)[2:].zfill(4))
-                results.append(BrowserCheckResult.TAMPERED)
+                results.append(
+                    BrowserCheckResult(
+                        BrowserCheckVerdict.TAMPERED,
+                        reason=f"Unknown: {detection:>04x}",
+                    )
+                )
 
-    if len(browsers) != 1:
-        print("unable to identify browser", browsers)
-        results.append(BrowserCheckResult.SUSPICIOUS)
-    else:
-        (expected_browser,) = browsers
-        if browser != expected_browser:
-            print("browser mismatch", expected_browser, browser)
-            results.append(BrowserCheckResult.SUSPICIOUS)
+    browser = Browser.UNKNOWN
+    if len(browsers) == 1:
+        (browser,) = browsers
 
     if results:
-        return max(results, key=lambda x: x.value)
+        return max(results, key=lambda x: x.verdict.value)._replace(browser=browser)
 
-    return BrowserCheckResult.OK
+    return BrowserCheckResult(BrowserCheckVerdict.OK, browser=browser)
 
 
 def check_picasso(browserdata: BrowserData) -> tuple[BrowserCheckResult, int]:
@@ -447,7 +484,12 @@ def check_picasso(browserdata: BrowserData) -> tuple[BrowserCheckResult, int]:
         x in "0123456789abcdef" for x in browserdata["picasso"]
     ):
         print("picasso has incorrect length/values", browserdata["picasso"])
-        return BrowserCheckResult.TAMPERED, 0
+        return (
+            BrowserCheckResult(
+                BrowserCheckVerdict.TAMPERED, reason="Picasso invalid hex"
+            ),
+            0,
+        )
 
     picasso = bytes.fromhex(browserdata["picasso"])
 
@@ -458,6 +500,11 @@ def check_picasso(browserdata: BrowserData) -> tuple[BrowserCheckResult, int]:
     expected_checksum = crc32(picasso[:8])
     if expected_checksum != checksum:
         print("picasso has incorrect checksum", fp, checksum, expected_checksum)
-        return BrowserCheckResult.TAMPERED, 0
+        return (
+            BrowserCheckResult(
+                BrowserCheckVerdict.TAMPERED, reason="Picasso invalid checksum"
+            ),
+            0,
+        )
 
-    return BrowserCheckResult.OK, fp
+    return BrowserCheckResult(BrowserCheckVerdict.OK), fp

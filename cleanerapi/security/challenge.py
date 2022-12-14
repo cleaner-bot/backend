@@ -16,7 +16,7 @@ from pydantic import BaseModel, ValidationError, conint, constr
 from sanic import HTTPResponse, Request, json, text
 
 from ..helpers.based import b64parse
-from .browserdetect import BrowserCheckResult, BrowserData, browser_check
+from .browserdetect import BrowserCheckVerdict, BrowserData, browser_check
 from .captcha_providers import providers
 from .fingerprint import fingerprint as fingerprint_request
 from .proxy import is_request_from_proxy
@@ -232,20 +232,20 @@ async def verify_request(
     if picasso_matching > 30:
         return text("Ratelimit reached", 429)
 
-    match result:
-        case BrowserCheckResult.AUTOMATED:
+    match result.verdict:
+        case BrowserCheckVerdict.AUTOMATED:
             await database.set(f"cache:ip:{request.ip}:banned", "1", ex=60)
             return text("Automation software detected", 403)
-        case BrowserCheckResult.BAD_REQUEST:
+        case BrowserCheckVerdict.BAD_REQUEST:
             return text("Bad request", 400)
-        case BrowserCheckResult.SUSPICIOUS:
+        case BrowserCheckVerdict.SUSPICIOUS:
             captchas.extend(("pow", "hcaptcha"))
-        case BrowserCheckResult.TAMPERED:
+        case BrowserCheckVerdict.TAMPERED:
             captchas.extend(
                 ("pow", "hcaptcha", "turnstile", "button", "pow", "hcaptcha")
             )
 
-    if result != BrowserCheckResult.OK and requirement.level == SecurityLevel.RAID:
+    if result != BrowserCheckVerdict.OK and requirement.level == SecurityLevel.RAID:
         return text("Temporarily unavailable.", 403)
 
     if await is_request_from_proxy(request):
