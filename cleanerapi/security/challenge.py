@@ -126,6 +126,7 @@ async def log_request(
                         {"name": name, "value": value, "inline": inline}
                         for name, value, inline in fields
                     ],
+                    "color": 0x2F3136,
                 }
             ]
         },
@@ -309,4 +310,5 @@ async def verify_request(
     else:
         fields.append(("CAPTCHA invalid", ":x:", False))
 
+    await log_request(request, fields, "Next CAPTCHA")
     return generate_response(request, requirement.unique, captcha_index, captchas)
