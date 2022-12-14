@@ -228,9 +228,9 @@ def check_math(browserdata: BrowserData) -> BrowserCheckResult:
 
 
 def check_browser_headers(request: Request) -> BrowserCheckResult:
-    if request.headers.keys() & SEC_CH_UA_HEADERS != SEC_CH_UA_HEADERS:
+    if request.headers.keys() & SEC_CH_UA_HEADERS == SEC_CH_UA_HEADERS:
         return BrowserCheckResult(BrowserCheckVerdict.OK, Browser.CHROMIUM)
-    elif request.headers.keys() & SEC_FETCH_HEADERS != SEC_FETCH_HEADERS:
+    elif request.headers.keys() & SEC_FETCH_HEADERS == SEC_FETCH_HEADERS:
         return BrowserCheckResult(BrowserCheckVerdict.OK, Browser.FIREFOX)
 
     return BrowserCheckResult(BrowserCheckVerdict.OK, Browser.WEBKIT)
