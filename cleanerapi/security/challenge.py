@@ -197,10 +197,10 @@ async def verify_request(
 
     fields.extend(
         (
-            ("\u200B", "\u200B", False),
-            ("CAPTCHA", f"{cr.c.i}/{cr.c.p}", True),
+            # ("\u200B", "\u200B", False),
+            ("CAPTCHA", f"{cr.c.p} ({cr.c.i})", True),
             ("Issue time", f"<t:{cr.c.t}>", True),
-            ("\u200B", "\u200B", False),
+            ("\u200B", "\u200B", True),
             ("Request FP", f"`{request_fp.hex()[:8]}...`", True),
         )
     )
@@ -257,7 +257,7 @@ async def verify_request(
         (
             ("Browser FP", f"`{fp.hex()[:8]}...`", True),
             ("Picasso", f"`{picasso:>08x}`", True),
-            ("\u200B", "\u200B", False),
+            ("\u200B", "\u200B", True),
             ("Browser result", result.verdict.name, True),
         )
     )
@@ -293,7 +293,7 @@ async def verify_request(
         return text("Temporarily unavailable.", 403)
 
     if await is_request_from_proxy(request):
-        fields.append(("Is proxy", ":white_check_mark:", False))
+        fields.append(("Is proxy", ":white_check_mark:", True))
         if requirement.level == SecurityLevel.RAID:
             await log_request(request, fields, "Blocked due to raid")
             return text("Temporarily unavailable.", 403)
@@ -307,10 +307,10 @@ async def verify_request(
     if isinstance(token, str) and await providers[cr.c.p].verify(
         request, token=token, signature=signature, minimum_timestamp=cr.c.t
     ):
-        fields.append(("CAPTCHA valid", ":white_check_mark:", False))
+        fields.append(("CAPTCHA valid", ":white_check_mark:", True))
         captcha_index += 1
     else:
-        fields.append(("CAPTCHA invalid", ":x:", False))
+        fields.append(("CAPTCHA invalid", ":x:", True))
 
     await log_request(request, fields, "Next CAPTCHA")
     return generate_response(request, requirement.unique, captcha_index, captchas)
