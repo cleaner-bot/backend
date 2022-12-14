@@ -142,6 +142,8 @@ def browser_check(
     else:
         platform = Platform.UNKNOWN
 
+    print(browsers, platforms)
+
     if browser == Browser.UNKNOWN:
         results.append(
             BrowserCheckResult(
