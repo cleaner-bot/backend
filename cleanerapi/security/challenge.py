@@ -273,9 +273,11 @@ async def verify_request(
 
     match result.verdict:
         case BrowserCheckVerdict.AUTOMATED:
+            await log_request(request, fields, "Aborted due to automation software")
             await database.set(f"cache:ip:{request.ip}:banned", "1", ex=60)
             return text("Automation software detected", 403)
         case BrowserCheckVerdict.BAD_REQUEST:
+            await log_request(request, fields, "Aborted due to bad request")
             return text("Bad request", 400)
         case BrowserCheckVerdict.SUSPICIOUS:
             captchas.extend(("pow", "hcaptcha"))
