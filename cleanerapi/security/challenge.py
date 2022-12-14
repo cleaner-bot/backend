@@ -257,7 +257,6 @@ async def verify_request(
         (
             ("Browser FP", f"`{fp.hex()[:8]}...`", True),
             ("Picasso", f"`{picasso:>08x}`", True),
-            ("\u200B", "\u200B", True),
             ("Browser result", result.verdict.name, True),
         )
     )
