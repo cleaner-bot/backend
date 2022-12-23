@@ -163,7 +163,7 @@ async def get_registration_u2f_mfa(
 
     display_name = user["name"] + "#" + user["discriminator"]
     registration_options = generate_registration_options(
-        rp_id="localhost",
+        rp_id="cleanerbot.xyz",
         rp_name="The Cleaner Bot - Dashboard",
         user_id=str(request.ctx.user_token.user_id),
         user_name=display_name,
@@ -210,8 +210,8 @@ async def post_registration_u2f_mfa(
         registration_verification = verify_registration_response(
             credential=credential,
             expected_challenge=challenge,
-            expected_origin="http://localhost:3000",
-            expected_rp_id="localhost",
+            expected_origin="https://cleanerbot.xyz",
+            expected_rp_id="cleanerbot.xyz",
         )
     except InvalidRegistrationResponse:
         return text("Verification failed", 400)
@@ -254,7 +254,7 @@ async def get_authentication_u2f_mfa(
         return text("U2F not allowed", 403)
 
     authentication_options = generate_authentication_options(
-        rp_id="localhost",
+        rp_id="cleanerbot.xyz",
         allow_credentials=[PublicKeyCredentialDescriptor(id=u2f_cretential_id)],
     )
 
@@ -306,8 +306,8 @@ async def post_authentication_u2f_mfa(
         authentication_verification = verify_authentication_response(
             credential=credential,
             expected_challenge=challenge,
-            expected_origin="http://localhost:3000",
-            expected_rp_id="localhost",
+            expected_origin="https://cleanerbot.xyz",
+            expected_rp_id="cleanerbot.xyz",
             credential_public_key=credential_public_key,
             credential_current_sign_count=int(sign_count),
         )
