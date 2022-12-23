@@ -217,12 +217,12 @@ async def check_super_verification(
         return text("User not in guild", 404)
 
     jointime = await database.hget(
-        f"guild:{guild}:super-verification", str(user_token.user_id)
+        f"guild:{guild}:timelimit", str(user_token.user_id)
     )
     if jointime is None:
         return text("Already verified", 404)
 
-    danger = await database.hlen(f"guild:{guild}:super-verification")
+    danger = await database.hlen(f"guild:{guild}:timelimit")
     if danger >= 20:
         return CaptchaRequirement(SecurityLevel.RAID, f"sv{user_token.user_id}|{guild}")
     elif danger >= 10:
