@@ -216,9 +216,7 @@ async def check_super_verification(
     if all(x["id"] != guild for x in guilds):
         return text("User not in guild", 404)
 
-    jointime = await database.hget(
-        f"guild:{guild}:timelimit", str(user_token.user_id)
-    )
+    jointime = await database.hget(f"guild:{guild}:timelimit", str(user_token.user_id))
     if jointime is None:
         return text("Already verified", 404)
 
@@ -243,7 +241,7 @@ async def complete_super_verification(
 ) -> HTTPResponse:
     result = await rpc_call(
         database,
-        "super-verification",
+        "super-verification:verify",
         int(payload["guild"]),
         request.ctx.user_token.user_id,
     )
