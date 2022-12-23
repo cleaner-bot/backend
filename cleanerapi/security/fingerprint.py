@@ -24,8 +24,8 @@ def fingerprint(request: Request, seed: str) -> bytes:
         genes.append(str(len(all_values)))
         genes.extend(all_values)
 
-    for referer in headers.getall("referer", []):
-        genes.append(referer.split("/")[2])
+    # for referer in headers.getall("referer", []):
+    #     genes.append(referer.split("/")[2])
 
     genes.append(request.ip)
     genes.append(seed)
