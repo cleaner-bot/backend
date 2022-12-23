@@ -242,7 +242,7 @@ async def complete_super_verification(
     result = await rpc_call(
         database,
         "super-verification:verify",
-        int(payload["guild"]),
+        int(payload["g"]),
         request.ctx.user_token.user_id,
     )
     if not result["ok"]:
