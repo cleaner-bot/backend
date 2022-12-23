@@ -113,8 +113,8 @@ default_entitlements = {
     "report": 1,
     "name_advanced": 1,
     "verification": 0,  # unused
-    "super_verification": 1,
-    "verification_timelimit": 1,
+    "super_verification": 0,
+    "verification_timelimit": 0,
     "bansync_subscription_limit": 10,
     "auth": 1,
     "linkfilter": 0,
