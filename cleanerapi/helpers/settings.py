@@ -88,6 +88,7 @@ default_config = {
     "linkfilter_enabled": False,
     "linkfilter_channel": "0",
     "linkfilter_blockunknown": False,
+    "filterrules_enabled": False,
 }
 
 default_entitlements = {
@@ -118,6 +119,7 @@ default_entitlements = {
     "bansync_subscription_limit": 10,
     "auth": 1,
     "linkfilter": 0,
+    "filterrules": 1,
 }
 
 
@@ -240,6 +242,7 @@ config_validators: dict[str, typing.Callable[..., bool]] = {
     "linkfilter_enabled": validate_boolean,
     "linkfilter_channel": validate_snowflake,
     "linkfilter_blockunknown": validate_boolean,
+    "filterrules_enabled": validate_boolean,
 }
 
 
