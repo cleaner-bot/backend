@@ -187,7 +187,10 @@ async def patch_filterrules_phase_rule(
         except Exception as e:
             return text(e.args[0], 422)
 
-        variables = {}
+        variables = {
+            "current.time": int,
+            "current.phase": bytes,
+        }
         for scope in ALL_PHASES[phase]["scopes"]:
             variables.update(SCOPES[scope])
         err = filterrules.lint(ast, variables, FUNCTIONS)
