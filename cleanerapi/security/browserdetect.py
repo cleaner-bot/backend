@@ -453,7 +453,7 @@ def check_detections(browserdata: BrowserData) -> BrowserCheckResult:
                     case 0x3004:
                         browsers &= {Browser.WEBKIT}
                     case _:
-                        print("unknown brower check", hex(detection)[2:].zfill(4))
+                        print("unknown browser check", hex(detection)[2:].zfill(4))
                         results.append(
                             BrowserCheckResult(
                                 BrowserCheckVerdict.TAMPERED,
