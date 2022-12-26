@@ -1,7 +1,9 @@
 from coredis import Redis
-from sanic import Blueprint, HTTPResponse, Request, json
+from sanic import Blueprint, HTTPResponse, Request, json, text
 from sanic.response import empty
 from sanic_ext import openapi
+
+from ...helpers.settings import get_entitlement_field
 
 bp = Blueprint("LinkFilter", version=1)
 
@@ -19,6 +21,11 @@ bp = Blueprint("LinkFilter", version=1)
 async def get_linkfilter_urls(
     request: Request, guild: int, database: Redis[bytes]
 ) -> HTTPResponse:
+    if await get_entitlement_field(
+        database, guild, "plan"
+    ) < await get_entitlement_field(database, guild, "linkfilter"):
+        return text("Missing linkfilter entitlement", 403)
+
     whitelist = [
         x.decode()
         for x in await database.lrange(f"guild:{guild}:linkfilter:whitelist", 0, -1)

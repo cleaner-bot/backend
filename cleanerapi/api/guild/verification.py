@@ -34,6 +34,10 @@ async def post_verification_message(
 ) -> HTTPResponse:
     if not validate_snowflake(body.channel_id):
         return text("Invalid channel id", 400)
+    elif await get_entitlement_field(
+        database, guild, "plan"
+    ) < await get_entitlement_field(database, guild, "verification"):
+        return text("Missing verification entitlement", 403)
 
     response = await rpc_call(
         database, "verification:post-message", guild, int(body.channel_id)

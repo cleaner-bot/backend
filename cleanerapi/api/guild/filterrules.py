@@ -8,6 +8,8 @@ from sanic import Blueprint, HTTPResponse, Request, json, text
 from sanic.response import empty
 from sanic_ext import openapi
 
+from ...helpers.settings import get_entitlement_field
+
 bp = Blueprint("FIlterRules", version=1)
 ALL_PHASES = {
     "member_create": {
@@ -91,6 +93,11 @@ RULES_PER_PHASE = 5
 async def get_filterrules(
     request: Request, guild: int, database: Redis[bytes]
 ) -> HTTPResponse:
+    if await get_entitlement_field(
+        database, guild, "plan"
+    ) < await get_entitlement_field(database, guild, "filterrules"):
+        return text("Missing filterrules entitlement", 403)
+
     rules = {}
     for phase in ALL_PHASES:
         raw_rules = await database.lrange(f"guild:{guild}:filterrules:{phase}", 0, -1)
@@ -114,6 +121,11 @@ async def get_filterrules(
 async def post_filterrules_phase(
     request: Request, guild: int, phase: str, database: Redis[bytes]
 ) -> HTTPResponse:
+    if await get_entitlement_field(
+        database, guild, "plan"
+    ) < await get_entitlement_field(database, guild, "filterrules"):
+        return text("Missing filterrules entitlement", 403)
+
     if phase not in ALL_PHASES:
         return text("Unknown phase", 404)
     length = await database.llen(f"guild:{guild}:filterrules:{phase}")
@@ -145,6 +157,11 @@ async def post_filterrules_phase(
 async def patch_filterrules_phase_rule(
     request: Request, guild: int, phase: str, index: int, database: Redis[bytes]
 ) -> HTTPResponse:
+    if await get_entitlement_field(
+        database, guild, "plan"
+    ) < await get_entitlement_field(database, guild, "filterrules"):
+        return text("Missing filterrules entitlement", 403)
+
     if phase not in ALL_PHASES:
         return text("Unknown phase", 404)
     elif not RULES_PER_PHASE > index >= 0:
