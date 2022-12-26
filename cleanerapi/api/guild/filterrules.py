@@ -11,7 +11,7 @@ from sanic_ext import openapi
 from ...helpers.settings import get_entitlement_field
 
 bp = Blueprint("FIlterRules", version=1)
-ALL_PHASES = {
+ALL_EVENTS = {
     "member_create": {
         "actions": ("disabled", "allow", "kickonly", "banonly", "auto"),
         "scopes": ("user", "member"),
@@ -77,11 +77,11 @@ FUNCTIONS: dict[str, tuple[tuple[type, ...], type]] = {
     "ends_with": ((bytes,), bool),
     "to_string": ((object,), bytes),
 }
-RULES_PER_PHASE = 5
+RULES_PER_EVENT = 5
 
 
 @bp.get("/guild/<guild:int>/filterrules")
-@openapi.summary("returns a list of all filterrules and phases")
+@openapi.summary("returns a list of all filterrules and events")
 @openapi.secured("user")
 @openapi.response(200, {"application/json"}, "Success")
 @openapi.response(400, {"text/plain": str}, "Bad request")
@@ -99,16 +99,16 @@ async def get_filterrules(
         return text("Missing filterrules entitlement", 403)
 
     rules = {}
-    for phase in ALL_PHASES:
-        raw_rules = await database.lrange(f"guild:{guild}:filterrules:{phase}", 0, -1)
-        rules[phase] = [
+    for event in ALL_EVENTS:
+        raw_rules = await database.lrange(f"guild:{guild}:filterrules:{event}", 0, -1)
+        rules[event] = [
             {"action": action, "name": name, "code": code.decode()}
             for action, name, code in map(msgpack.unpackb, raw_rules)
         ]
     return json(rules)
 
 
-@bp.post("/guild/<guild:int>/filterrules/<phase:str>")
+@bp.post("/guild/<guild:int>/filterrules/<event:str>")
 @openapi.summary("create a new filterrule")
 @openapi.secured("user")
 @openapi.response(200, {"application/json"}, "Success")
@@ -118,33 +118,33 @@ async def get_filterrules(
 @openapi.response(404, {"text/plain": str}, "Guild not found")
 @openapi.response(500, {"text/plain": str}, "Internal error")
 @openapi.response(503, {"text/plain": str}, "Failed to connect to database")
-async def post_filterrules_phase(
-    request: Request, guild: int, phase: str, database: Redis[bytes]
+async def post_filterrules_event(
+    request: Request, guild: int, event: str, database: Redis[bytes]
 ) -> HTTPResponse:
     if await get_entitlement_field(
         database, guild, "plan"
     ) < await get_entitlement_field(database, guild, "filterrules"):
         return text("Missing filterrules entitlement", 403)
 
-    if phase not in ALL_PHASES:
-        return text("Unknown phase", 404)
-    length = await database.llen(f"guild:{guild}:filterrules:{phase}")
-    if length >= RULES_PER_PHASE:
-        return text(f"Limit of rules ({RULES_PER_PHASE}) reached.", 403)
+    if event not in ALL_EVENTS:
+        return text("Unknown event", 404)
+    length = await database.llen(f"guild:{guild}:filterrules:{event}")
+    if length >= RULES_PER_EVENT:
+        return text(f"Limit of rules ({RULES_PER_EVENT}) reached.", 403)
 
     data = typing.cast(bytes, msgpack.packb(("disabled", f"rule {length + 1}", b"")))
-    new_length = await database.rpush(f"guild:{guild}:filterrules:{phase}", (data,))
-    if new_length >= RULES_PER_PHASE:
-        await database.rpop(f"guild:{guild}:filterrules:{phase}")
+    new_length = await database.rpush(f"guild:{guild}:filterrules:{event}", (data,))
+    if new_length >= RULES_PER_EVENT:
+        await database.rpop(f"guild:{guild}:filterrules:{event}")
         return text(
-            f"Limit of rules ({RULES_PER_PHASE}) reached. (race condition triggered)",
+            f"Limit of rules ({RULES_PER_EVENT}) reached. (race condition triggered)",
             403,
         )
 
     return json({"action": "disabled", "name": f"rule {length + 1}", "code": ""})
 
 
-@bp.patch("/guild/<guild:int>/filterrules/<phase:str>/<index:int>")
+@bp.patch("/guild/<guild:int>/filterrules/<event:str>/<index:int>")
 @openapi.summary("create a new filterrule")
 @openapi.secured("user")
 @openapi.response(204, description="Updated")
@@ -154,25 +154,25 @@ async def post_filterrules_phase(
 @openapi.response(404, {"text/plain": str}, "Guild not found")
 @openapi.response(500, {"text/plain": str}, "Internal error")
 @openapi.response(503, {"text/plain": str}, "Failed to connect to database")
-async def patch_filterrules_phase_rule(
-    request: Request, guild: int, phase: str, index: int, database: Redis[bytes]
+async def patch_filterrules_event_rule(
+    request: Request, guild: int, event: str, index: int, database: Redis[bytes]
 ) -> HTTPResponse:
     if await get_entitlement_field(
         database, guild, "plan"
     ) < await get_entitlement_field(database, guild, "filterrules"):
         return text("Missing filterrules entitlement", 403)
 
-    if phase not in ALL_PHASES:
-        return text("Unknown phase", 404)
-    elif not RULES_PER_PHASE > index >= 0:
+    if event not in ALL_EVENTS:
+        return text("Unknown event", 404)
+    elif not RULES_PER_EVENT > index >= 0:
         return text("Invalid rule index", 400)
-    current = await database.lindex(f"guild:{guild}:filterrules:{phase}", index)
+    current = await database.lindex(f"guild:{guild}:filterrules:{event}", index)
     if current is None:
         return text("Unknown rule", 404)
     current_action, current_name, current_code = msgpack.unpackb(current)
 
     body = request.json
-    if "action" not in body or body["action"] not in ALL_PHASES[phase]["actions"]:
+    if "action" not in body or body["action"] not in ALL_EVENTS[event]["actions"]:
         body["action"] = current_action
     if "name" not in body or not re.fullmatch("^[a-zA-Z ]{2,32}$", body["name"]):
         body["name"] = current_name
@@ -189,9 +189,11 @@ async def patch_filterrules_phase_rule(
 
         variables = {
             "current.time": int,
-            "current.phase": bytes,
+            "current.event": bytes,
+            "true": bool,
+            "false": bool,
         }
-        for scope in ALL_PHASES[phase]["scopes"]:
+        for scope in ALL_EVENTS[event]["scopes"]:
             variables.update(SCOPES[scope])
         err = filterrules.lint(ast, variables, FUNCTIONS)
         if err is not None:
@@ -200,5 +202,5 @@ async def patch_filterrules_phase_rule(
     data = typing.cast(
         bytes, msgpack.packb((body["action"], body["name"], body["code"].encode()))
     )
-    await database.lset(f"guild:{guild}:filterrules:{phase}", index, data)
+    await database.lset(f"guild:{guild}:filterrules:{event}", index, data)
     return empty()
