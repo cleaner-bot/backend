@@ -6,7 +6,7 @@ from sanic.response import empty
 from sanic_ext import openapi, validate
 
 from ...helpers.rpc import rpc_call
-from ...helpers.settings import validate_snowflake, get_entitlement_field
+from ...helpers.settings import get_entitlement_field, validate_snowflake
 
 bp = Blueprint("GuildVerification", version=1)
 
@@ -61,7 +61,9 @@ async def post_super_verification_message(
 ) -> HTTPResponse:
     if not validate_snowflake(body.channel_id):
         return text("Invalid channel id", 400)
-    elif await get_entitlement_field(database, guild, "plan") < await get_entitlement_field(database, guild, "super_verification"):
+    elif await get_entitlement_field(
+        database, guild, "plan"
+    ) < await get_entitlement_field(database, guild, "super_verification"):
         return text("Missing super_verification entitlement", 403)
 
     response = await rpc_call(
