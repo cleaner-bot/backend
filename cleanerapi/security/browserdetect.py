@@ -304,17 +304,17 @@ def check_locale_spoof(
             intl_check.encode(),
         )
     # firefox seems to have issues with this
-    elif (
-        intl_check.split("|")[0] != intl_check.split("|")[1]
-        and browser != Browser.FIREFOX
-    ):
-        print("invalid localestring values", intl_check)
-        return (
-            BrowserCheckResult(
-                BrowserCheckVerdict.SUSPICIOUS, reason="Mismatching localestring"
-            ),
-            intl_check.encode(),
-        )
+    # elif (
+    #     intl_check.split("|")[0] != intl_check.split("|")[1]
+    #     and browser != Browser.FIREFOX
+    # ):
+    #     print("invalid localestring values", intl_check)
+    #     return (
+    #         BrowserCheckResult(
+    #             BrowserCheckVerdict.SUSPICIOUS, reason="Mismatching localestring"
+    #         ),
+    #         intl_check.encode(),
+    #     )
 
     return BrowserCheckResult(BrowserCheckVerdict.OK), intl_check.encode()
 
