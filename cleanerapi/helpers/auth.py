@@ -108,11 +108,15 @@ async def get_user(request: Request, database: Redis[bytes]) -> UserInfo:
             await database.delete((f"user:{user_id}:oauth2",))
             raise SanicException("Unauthorized", 401)
 
+        flags = []
+        if user.is_mfa_enabled:
+            flags.append("discord:mfa")
         user_object: UserInfo = {
             "id": str(user.id),
             "name": user.username,
             "discriminator": user.discriminator,
             "avatar": user.avatar_hash or "",
+            "flags": flags,
         }
         await database.hset(
             f"cache:user:{user.id}",
@@ -194,6 +198,7 @@ class UserInfo(typing.TypedDict):
     name: str
     discriminator: str
     avatar: str
+    flags: list[str]
 
 
 DEVELOPERS = {633993042755452932, 647558454491480064}

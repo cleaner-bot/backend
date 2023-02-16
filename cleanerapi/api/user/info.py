@@ -16,12 +16,21 @@ bp = Blueprint("UserInfo", version=1)
 @openapi.response(500, {"text/plain": str}, "Internal error")
 @openapi.response(503, {"text/plain": str}, "Failed to connect to database")
 async def get_user_me(request: Request, database: Redis[bytes]) -> HTTPResponse:
-    user = typing.cast(dict[str, str | bool], await get_user(request, database))
+    user = typing.cast(
+        dict[str, str | bool | list[str]], await get_user(request, database)
+    )
+    flags = typing.cast(list[str], user["flags"])
+
     if is_developer(request.ctx.user_token.user_id):
         user["is_dev"] = True
+        flags.append("developer")
+
     mfa_valid = (
         request.ctx.user_token.is_mfa_valid()
         and request.ctx.user_token.is_fingerprint_valid(request)
     )
     user["has_mfa"] = mfa_valid
+    if mfa_valid:
+        flags.append("mfa_verified")
+
     return json(user)

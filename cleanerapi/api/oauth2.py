@@ -9,7 +9,7 @@ from hikari.internal.time import utc_datetime
 from sanic import Blueprint, HTTPResponse, Request, json, text
 from sanic_ext import openapi, validate
 
-from ..helpers.auth import UserInfo, UserToken, create_user_token
+from ..helpers.auth import UserToken, create_user_token
 from ..security.fingerprint import fingerprint
 
 bp = Blueprint("OAuth2Platform", "/oauth2/d", version=1)
@@ -90,19 +90,6 @@ async def post_authorize(
         0,
         fingerprint(request, "user")[:6],
     )
-
-    # prefill cache
-    user_object: UserInfo = {
-        "id": str(auth.user.id),
-        "name": auth.user.username,
-        "discriminator": auth.user.discriminator,
-        "avatar": auth.user.avatar_hash or "",
-    }
-    await database.hset(
-        f"cache:user:{auth.user.id}",
-        typing.cast(dict[str | bytes, str | bytes | int | float], user_object),
-    )
-    await database.expire(f"cache:user:{auth.user.id}", 30)
 
     return json(
         {
