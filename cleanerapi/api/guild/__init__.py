@@ -2,7 +2,7 @@ import typing
 
 from sanic import Blueprint, HTTPResponse, Request, text
 
-from ...helpers.auth import get_user_guilds, is_developer, parse_user_token
+from ...helpers.auth import get_user, get_user_guilds, is_developer, parse_user_token
 from ...helpers.rpc import rpc_call
 from ...helpers.settings import get_config_field, get_entitlement_field
 from . import bansync, filterrules, linkfilter, settings, statistics, verification
@@ -63,10 +63,24 @@ async def authentication_middleware(request: Request) -> HTTPResponse | None:
         )
 
     request.ctx.guild = matched_guild
+    guild_info = await rpc_call(database, "dash:guild-info", int(guild_id))
+
+    if not guild_info["ok"]:
+        if guild_info["message"] == "guild_not_found":
+            return text("Guild not found", 404)
+        return text(guild_info["message"], 503)
+
+    request.ctx.guild_info = guild_info["data"]
+
     if request.method != "GET":
         suspended = await get_entitlement_field(database, guild_id, "suspended")
         if suspended:
             return text("Suspended - " + suspended, 403)
+
+        if guild_info["data"]["mfa_level"]:
+            user = await get_user(request, database)
+            if "discord:mfa" not in user["flags"]:
+                return text("This action requires MFA enabled on Discord", 403)
 
         if matched_guild["requires_mfa"] and (
             not user_token.is_mfa_valid()

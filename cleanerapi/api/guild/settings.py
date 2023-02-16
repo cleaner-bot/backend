@@ -4,7 +4,6 @@ from sanic.response import empty
 from sanic_ext import openapi
 
 from ...helpers.auth import is_developer
-from ...helpers.rpc import rpc_call
 from ...helpers.settings import (
     config_validators,
     default_entitlements,
@@ -30,19 +29,13 @@ bp = Blueprint("GuildSettings", version=1)
 async def get_guild(
     request: Request, guild: int, database: Redis[bytes]
 ) -> HTTPResponse:
-    guild_info = await rpc_call(database, "dash:guild-info", guild)
     config = await get_config(database, guild)
     entitlements = await get_entitlements(database, guild)
-
-    if not guild_info["ok"]:
-        if guild_info["message"] == "guild_not_found":
-            return text("Guild not found", 404)
-        return text(guild_info["message"], 503)
 
     return json(
         {
             "guild": {
-                **guild_info["data"],
+                **request.ctx.guild_info,
                 "access": {
                     "type": request.ctx.guild["access_type"],
                     "requires_mfa": request.ctx.guild["requires_mfa"],
