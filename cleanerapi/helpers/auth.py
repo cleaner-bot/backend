@@ -89,12 +89,9 @@ async def get_user(request: Request, database: Redis[bytes]) -> UserInfo:
     user_id = typing.cast(int, request.ctx.user_token.user_id)
     hikari_rest = typing.cast(hikari.RESTApp, request.app.ctx.hikari_rest)
     async with named_locks[f"user:{user_id}"]:
-        cached = await database.hgetall(f"cache:user:{user_id}")
+        cached = await database.get(f"cache:user:{user_id}")
         if cached:
-            return typing.cast(
-                UserInfo,
-                {k.decode(): v.decode() for k, v in cached.items()},
-            )
+            return typing.cast(UserInfo, msgpack.unpackb(cached))
 
         token = await database.hget(f"user:{user_id}:oauth2", "token")
         if token is None:
@@ -118,10 +115,7 @@ async def get_user(request: Request, database: Redis[bytes]) -> UserInfo:
             "avatar": user.avatar_hash or "",
             "flags": flags,
         }
-        await database.hset(
-            f"cache:user:{user.id}",
-            typing.cast(dict[str | bytes, str | bytes | int | float], user_object),
-        )
+        await database.set(f"cache:user:{user.id}", msgpack.packb(user_object))
         await database.expire(f"cache:user:{user.id}", 30)
         return user_object
 
