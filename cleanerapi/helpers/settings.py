@@ -88,6 +88,7 @@ default_config = {
     "linkfilter_enabled": False,
     "linkfilter_channel": "0",
     "linkfilter_blockunknown": False,
+    "linkfilter_linkpreview": False,
     "filterrules_enabled": False,
 }
 
@@ -242,6 +243,7 @@ config_validators: dict[str, typing.Callable[..., bool]] = {
     "linkfilter_enabled": validate_boolean,
     "linkfilter_channel": validate_snowflake,
     "linkfilter_blockunknown": validate_boolean,
+    "linkfilter_linkpreview": validate_boolean,
     "filterrules_enabled": validate_boolean,
 }
 
