@@ -71,6 +71,7 @@ default_config = {
     "name_discord_enabled": True,
     "name_advanced_enabled": False,
     "name_advanced_words": [],
+    "name_roles": [],
     "joinguard_enabled": False,
     "joinguard_captcha": False,
     "report_enabled": False,
@@ -220,6 +221,7 @@ config_validators: dict[str, typing.Callable[..., bool]] = {
         lambda x: isinstance(x, list)
         and all(map(lambda y: isinstance(y, str) and 32 >= len(y) > 0, x))
     ),
+    "name_roles": validate_snowflakes,
     "joinguard_enabled": validate_boolean,
     "joinguard_captcha": validate_boolean,
     "report_enabled": validate_boolean,
