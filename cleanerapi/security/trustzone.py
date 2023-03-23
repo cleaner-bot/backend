@@ -375,7 +375,7 @@ def decrypt(value: str | int, ekey: int) -> str | int | bool | None | _Undefined
         case 3:
             return UNDEFINED
         case _:
-            return data[1 : -data[::-1].index(0) - 2].decode()
+            return data[1 : -data[::-1].index(0) - 2].decode(errors="replace")
 
 
 checks: tuple[tuple[str, tuple[str, ...]], ...]
