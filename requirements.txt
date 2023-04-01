@@ -1,7 +1,7 @@
 uvicorn[standard]>=0.15,<0.19
 coredis>=3.4,<4.3
 httpx>=0.16,<1
-hikari==2.0.0.dev109
+hikari==2.0.0.dev117
 python-dotenv>=0.19,<0.21
 pydantic>=1.10,<1.11
 sentry_sdk>=1.5,<1.9
