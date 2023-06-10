@@ -111,6 +111,7 @@ async def get_user(request: Request, database: Redis[bytes]) -> UserInfo:
         user_object: UserInfo = {
             "id": str(user.id),
             "name": user.username,
+            "global_name": user.global_name,
             "discriminator": user.discriminator,
             "avatar": user.avatar_hash or "",
             "flags": flags,
@@ -190,6 +191,7 @@ class PartialGuildInfo(typing.TypedDict):
 class UserInfo(typing.TypedDict):
     id: str
     name: str
+    global_name: str | None
     discriminator: str
     avatar: str
     flags: list[str]
