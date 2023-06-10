@@ -49,6 +49,7 @@ SCOPES = {
     "user": {
         "user.id": int,
         "user.username": bytes,
+        "user.global_name": bytes,
         "user.discriminator": bytes,
         "user.created_at": int,
         "user.has_avatar": bool,
@@ -174,7 +175,7 @@ async def patch_filterrules_event_rule(
     body = request.json
     if "action" not in body or body["action"] not in ALL_EVENTS[event]["actions"]:
         body["action"] = current_action
-    if "name" not in body or not re.fullmatch("^[a-zA-Z ]{2,32}$", body["name"]):
+    if "name" not in body or not re.fullmatch(r"^[a-zA-Z_-\d ]{2,32}$", body["name"]):
         body["name"] = current_name
     if "code" not in body:
         body["code"] = current_code.decode()
