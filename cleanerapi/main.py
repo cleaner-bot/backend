@@ -1,3 +1,4 @@
+import asyncio
 from coredis import Redis
 from hikari import RESTApp
 from httpx import AsyncClient
@@ -28,6 +29,8 @@ _httpx_singleton = app.ctx.http_client = AsyncClient(
 app.ext.add_dependency(Redis[bytes], lambda *_: _redis_singleton)
 app.ext.dependency(_httpx_singleton)
 app.ext.dependency(_hikari_singleton)
+
+asyncio.create_task(_hikari_singleton.start())
 
 app.ext.openapi.add_security_scheme(
     "user", "http", description="user authentication token"
